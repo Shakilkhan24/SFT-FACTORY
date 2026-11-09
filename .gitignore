@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/extract/
+*.tsbuildinfo
+coverage/
+.next/
+target/
+
+# Environment & secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!docs/adr/*.md
+
+# Local tool state
+.context/
+.factory-cache/
+.factory/local/
+*.local.json
+docs/adr/*.local.*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

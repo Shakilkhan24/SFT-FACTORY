@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Software Factory — an interactive blueprint</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="boot" class="boot">
+  <div class="boot-inner">
+    <div class="boot-mark"><span></span><span></span><span></span></div>
+    <div class="boot-text">Loading the factory…</div>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="brand-txt">
+      <h1>The Software Factory</h1>
+      <p id="brand-sub">An interactive map of a blueprint that turns a reviewed issue into a verified pull request</p>
+    </div>
+  </div>
+
+  <div class="top-right">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" class="search-ico" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search everything…  (press /)" autocomplete="off" spellcheck="false" />
+      <div id="search-results" class="search-results" hidden></div>
+    </div>
+    <button id="tour-btn" class="tour-btn" type="button">
+      <svg viewBox="0 0 24 24" class="t-ico" aria-hidden="true"><polygon points="7,4 20,12 7,20"/></svg>
+      <span>Guided tour</span>
+    </button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs" role="tablist"></nav>
+
+<main id="main"></main>
+
+<!-- drill-down drawer -->
+<aside id="drawer" class="drawer" hidden>
+  <div class="drawer-head">
+    <div class="drawer-kicker" id="drawer-kicker"></div>
+    <h2 id="drawer-title"></h2>
+    <button id="drawer-close" class="icon-btn" type="button" aria-label="Close">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</aside>
+<div id="scrim" class="scrim" hidden></div>
+
+<!-- tour overlay -->
+<div id="tour" class="tour" hidden>
+  <div class="tour-card" id="tour-card">
+    <div class="tour-step" id="tour-step"></div>
+    <h3 id="tour-title"></h3>
+    <p id="tour-text"></p>
+    <div class="tour-actions">
+      <button id="tour-skip" class="btn ghost" type="button">Skip</button>
+      <div class="tour-nav">
+        <button id="tour-prev" class="btn ghost" type="button">Back</button>
+        <button id="tour-next" class="btn primary" type="button">Next</button>
+      </div>
+    </div>
+    <div class="tour-dots" id="tour-dots"></div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
