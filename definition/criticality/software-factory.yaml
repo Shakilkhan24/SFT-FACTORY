@@ -1,0 +1,110 @@
+# CriticalityMap — the factory's own repository (pack 03 §4.8).
+#
+# The tier a change receives is max(score tier, criticality floor). A path classified
+# critical CANNOT be scored below this floor by a low-scoring change, so this file is a
+# floor, not a suggestion. It is owned by the owner (ADR-0022) and lives on the R4
+# human-only path list.
+
+apiVersion: factory/v1
+kind: CriticalityMap
+metadata:
+  repo: <owner>/software-factory
+spec:
+  paths:
+    - glob: "definition/**"
+      tier: R4
+      reason: "the factory's own behaviour; changing it changes what the factory is"
+
+    - glob: "migrations/**"
+      tier: R4
+      reason: "irreversible data change"
+
+    - glob: "packages/policy/**"
+      tier: R4
+      reason: "deterministic policy — the thing that decides what is allowed"
+
+    - glob: "packages/broker/**"
+      tier: R4
+      reason: "the capability boundary; every external call passes through it"
+
+    - glob: "packages/credentials/**"
+      tier: R4
+      reason: "secret handling"
+
+    - glob: "packages/eventlog/**"
+      tier: R4
+      reason: "the audit trail; a gap in it is an undetectable gap"
+
+    - glob: "packages/isolation/**"
+      tier: R4
+      reason: "the sandbox boundary"
+
+    - glob: "packages/approvals/**"
+      tier: R4
+      reason: "the human authority path"
+
+    - glob: "packages/contracts/**"
+      tier: R3
+      reason: "every other package depends on it; read every line"
+
+    - glob: "packages/state/**"
+      tier: R3
+      reason: "state machines; read every line"
+
+    - glob: "packages/context/**"
+      tier: R3
+      reason: "context assembly; read every line"
+
+    - glob: "packages/review/**"
+      tier: R3
+      reason: "review scoring; read every line"
+
+    - glob: "packages/merge/**"
+      tier: R3
+      reason: "merge rules; read every line"
+
+    - glob: "packages/gateway/**"
+      tier: R3
+      reason: "model gateway; read every line"
+
+    - glob: "packages/verify/**"
+      tier: R3
+      reason: "verification; read every line"
+
+    - glob: "packages/oracle/**"
+      tier: R3
+      reason: "oracle independence; read every line"
+
+    - glob: "tests/invariants/**"
+      tier: R4
+      reason: "the invariant suite; weakening it disables the guarantees"
+
+    - glob: "tests/redteam/**"
+      tier: R4
+      reason: "the adversarial suite; weakening it disables the guarantees"
+
+    - glob: "tests/acceptance/**"
+      tier: R4
+      reason: "the oracles; weakening them disables the guarantees"
+
+    - glob: ".github/**"
+      tier: R4
+      reason: "the gate itself"
+
+    - glob: "CODEOWNERS"
+      tier: R4
+      reason: "the human review floor"
+
+    - glob: "docs/**"
+      tier: R0
+      reason: "documentation"
+
+    - glob: "tools/**"
+      tier: R2
+      reason: "repo tooling; the guards inside it are R4 by path"
+
+  default: R2
+
+  dataClasses:
+    - glob: "packages/credentials/**"
+      class: secret

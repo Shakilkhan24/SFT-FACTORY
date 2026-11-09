@@ -1,0 +1,428 @@
+#!/usr/bin/env node
+/**
+ * tools/baseline — the pre-factory baseline (T-0.04, day-one clock #1).
+ *
+ * Commitment 5 of the blueprint: *no productivity number without a baseline*. This tool
+ * measures the target repo's **existing** human workflow — before any factory output exists —
+ * so that every later claim has something to be measured against.
+ *
+ * It reads **git history only**. No network, no API, no CI access: a baseline that depends on
+ * a live service cannot be reproduced, and a baseline nobody can reproduce is a rumour.
+ *
+ * The output is a distribution, not a mean (blueprint 14 §9.1 step 4). A mean of a
+ * bimodal distribution describes neither mode.
+ *
+ * Usage:
+ *   tools/baseline --repo <path> [--out <dir>] [--days 90] [--name <slug>]
+ *
+ * Writes `<out>/pre-factory-<date>.json` and `<out>/pre-factory-<date>.md`.
+ */
+
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
+
+/** The metrics the checklist names, in the checklist's order. */
+const METRIC_IDS = [
+  'pr_lead_time_hours',
+  'issue_to_merge_hours',
+  'review_rounds',
+  'pr_size_lines',
+  'revert_hotfix_rate',
+  'ci_failure_rate',
+];
+
+const parseArgs = (argv) => {
+  const args = { repo: process.cwd(), out: 'baselines', days: 90, name: undefined };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--repo') args.repo = argv[(i += 1)];
+    else if (arg === '--out') args.out = argv[(i += 1)];
+    else if (arg === '--days') args.days = Number(argv[(i += 1)]);
+    else if (arg === '--name') args.name = argv[(i += 1)];
+    else if (arg === '--help' || arg === '-h') args.help = true;
+    else throw new Error(`unknown argument: ${arg}`);
+  }
+  return args;
+};
+
+const USAGE = `usage: tools/baseline --repo <path> [--out <dir>] [--days 90] [--name <slug>]
+
+  --repo <path>   the target repository to measure (default: cwd)
+  --out <dir>     where to write the baseline (default: baselines)
+  --days <n>      the measurement window in days (default: 90)
+  --name <slug>   the repo slug used in the filename (default: the repo directory name)
+`;
+
+/**
+ * Run git and return stdout. `git` is invoked with an argv array — never a shell string
+ * (AGENTS.md §4).
+ */
+const git = (repo, args) =>
+  execFileSync('git', args, {
+    cwd: repo,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+/**
+ * Parse a git `--format=%H%x00%at%x00%P%x00%s` stream into commit records.
+ *
+ * Merge commits are INCLUDED: the merge is the event the PR-level metrics are anchored to
+ * (its timestamp is the end of the lead time, its numstat is the PR size). Their first
+ * parent is the base branch and their second parent is the PR's head.
+ */
+const readCommits = (repo, sinceIso) => {
+  const raw = git(repo, [
+    'log',
+    `--since=${sinceIso}`,
+    '--format=%H%x00%at%x00%P%x00%s%x00%b%x1e',
+  ]);
+  const commits = [];
+  for (const record of raw.split('\x1e')) {
+    const trimmed = record.trim();
+    if (trimmed === '') continue;
+    const [hash, at, parents, subject, body] = trimmed.split('\x00');
+    if (!hash) continue;
+    commits.push({
+      hash,
+      at: Number(at),
+      date: new Date(Number(at) * 1000).toISOString(),
+      parents: parents ? parents.split(' ').filter(Boolean) : [],
+      subject: subject ?? '',
+      body: body ?? '',
+    });
+  }
+  return commits;
+};
+
+/**
+ * The lines a commit added and removed.
+ *
+ * `--numstat` is used rather than `git show --stat` because it is machine-readable and does
+ * not require parsing a human-formatted diff. Binary files report `-` and are skipped.
+ */
+const readNumstat = (repo, hash) => {
+  const raw = git(repo, ['show', '--numstat', '--format=', hash]);
+  let added = 0;
+  let removed = 0;
+  let files = 0;
+  for (const line of raw.split('\n')) {
+    if (line.trim() === '') continue;
+    const [a, r, ...rest] = line.split('\t');
+    if (a === '-' || r === '-') continue; // binary
+    added += Number(a) || 0;
+    removed += Number(r) || 0;
+    files += 1;
+  }
+  return { added, removed, files };
+};
+
+/**
+ * A distribution, not a mean.
+ *
+ * The percentile is the nearest-rank percentile on the sorted sample — the same definition
+ * used for p50/p90/p95 elsewhere in the factory's measurement layer, so the numbers in a
+ * baseline are comparable with the numbers in a later report.
+ */
+const distribution = (values) => {
+  if (values.length === 0) {
+    return { count: 0, p50: null, p90: null, p95: null, min: null, max: null, mean: null };
+  }
+  const sorted = [...values].sort((a, b) => a - b);
+  const at = (q) => sorted[Math.min(sorted.length - 1, Math.ceil(q * sorted.length) - 1)];
+  const sum = sorted.reduce((acc, v) => acc + v, 0);
+  return {
+    count: sorted.length,
+    p50: at(0.5),
+    p90: at(0.9),
+    p95: at(0.95),
+    min: sorted[0],
+    max: sorted[sorted.length - 1],
+    mean: Math.round((sum / sorted.length) * 100) / 100,
+  };
+};
+
+/**
+ * The issue/PR identifier a commit message references, if any.
+ *
+ * The corpus's own convention is `#123` and `T-1.02`-style ticket ids. Only the first is a
+ * GitHub issue number; the second is a factory ticket.
+ */
+const referencedIssue = (commit) => {
+  const match = /(?:^|\s)#(\d+)\b/.exec(`${commit.subject}\n${commit.body}`);
+  return match ? Number(match[1]) : null;
+};
+
+/** The merge commit's first-parent chain gives the branch's history back to its base. */
+const firstParent = (commit) => (commit.parents.length > 0 ? commit.parents[0] : null);
+
+const analyse = (repo, days) => {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const commits = readCommits(repo, since);
+  const byHash = new Map(commits.map((c) => [c.hash, c]));
+
+  // --- merge commits and their pull requests -------------------------------
+  const mergeCommits = commits.filter((c) => c.parents.length > 1);
+  const prLeadTimes = [];
+  const issueToMerge = [];
+  const reviewRounds = [];
+  const prSizes = [];
+  const revertedPrs = [];
+  const reverted = new Set();
+
+  for (const merge of mergeCommits) {
+    const numstat = readNumstat(repo, merge.hash);
+    prSizes.push(numstat.added + numstat.removed);
+
+    // A squash-merge carries the PR title in the subject; a merge commit's first parent
+    // is the base branch, so the PR's own commits are the rest.
+    const subject = merge.subject.replace(/\s*\(#(\d+)\)\s*$/, '');
+    const issueNumber = referencedIssue(merge);
+    const prNumber = /\(#(\d+)\)\s*$/.exec(merge.subject)?.[1];
+
+    // --- lead time: first commit in the PR → merge -------------------------
+    const secondParent = merge.parents[1];
+    const head = byHash.get(secondParent);
+    if (head) {
+      // Walk the second parent's first-parent chain back to the merge's base.
+      let cursor = head;
+      let oldest = head;
+      const guard = new Set();
+      while (cursor && cursor.hash !== merge.parents[0] && !guard.has(cursor.hash)) {
+        guard.add(cursor.hash);
+        oldest = cursor;
+        cursor = byHash.get(firstParent(cursor)) ?? null;
+      }
+      const hours = (merge.at - oldest.at) / 3600;
+      if (hours >= 0) prLeadTimes.push(Math.round(hours * 100) / 100);
+    }
+
+    // --- issue → merge: the issue's own timestamp → merge -------------------
+    // The issue's creation time is not in git history. What git knows is the first commit
+    // that referenced the issue. That is a LOWER BOUND on the true interval, and the
+    // baseline says so rather than presenting it as the whole interval.
+    if (issueNumber !== null) {
+      const referencing = commits.filter(
+        (c) => c.hash !== merge.hash && referencedIssue(c) === issueNumber,
+      );
+      if (referencing.length > 0) {
+        const first = Math.min(...referencing.map((c) => c.at));
+        const hours = (merge.at - first) / 3600;
+        if (hours >= 0) issueToMerge.push(Math.round(hours * 100) / 100);
+      }
+    }
+
+    // --- review rounds ------------------------------------------------------
+    // Counted from the number of "review" mentions in the merge commit's message
+    // (e.g. "Addresses review feedback from N reviewers"), or from the number of
+    // distinct committer identities on the PR's branch when that is available.
+    // With git-only data, the conservative count is the number of authors on the branch.
+    const authors = new Set();
+    let cursor = byHash.get(secondParent);
+    const guard = new Set();
+    while (cursor && cursor.hash !== merge.parents[0] && !guard.has(cursor.hash)) {
+      guard.add(cursor.hash);
+      authors.add(cursor.subject);
+      cursor = byHash.get(firstParent(cursor)) ?? null;
+    }
+    // One author is the floor (the author themselves). More distinct subjects on the
+    // branch is a proxy for rounds; it is labelled as a proxy in the report.
+    reviewRounds.push(authors.size);
+
+    if (prNumber !== null) revertedPrs.push({ prNumber, mergedAt: merge.date });
+  }
+
+  // --- revert / hotfix rate -------------------------------------------------
+  // A revert is a commit whose subject starts with "Revert" — the git convention.
+  for (const commit of commits) {
+    if (/^Revert\s/.test(commit.subject)) {
+      reverted.add(commit.hash);
+      const target = /Revert\s+"([^"]+)"/.exec(commit.subject)?.[1];
+      if (target) reverted.add(target);
+    }
+  }
+  // A hotfix is a merge into a protected release branch within 14 days of the merge.
+  const fourteenDays = 14 * 24 * 60 * 60 * 1000;
+  const hotfixes = mergeCommits.filter((m) => {
+    const branchish = m.subject.includes('hotfix') || m.subject.includes('HOTFIX');
+    const recent = Date.now() - m.at * 1000 <= fourteenDays;
+    return branchish || recent;
+  });
+
+  // --- CI failure rate ------------------------------------------------------
+  // Not available from git history alone: CI results live in the CI system. What git
+  // *does* know is the presence of fixup commits — a second commit to the same subject
+  // within a short window is the signature of a failed CI run. This is a PROXY, and the
+  // report says so and records it as a gap rather than a measurement.
+  const subjects = commits.map((c) => c.subject);
+  const subjectCounts = new Map();
+  for (const subject of subjects) {
+    subjectCounts.set(subject, (subjectCounts.get(subject) ?? 0) + 1);
+  }
+  const fixupCommits = commits.filter((c) => (subjectCounts.get(c.subject) ?? 0) > 1);
+  const ciFailureRate =
+    commits.length === 0 ? null : Math.round((fixupCommits.length / commits.length) * 1000) / 10;
+
+  const revertRate =
+    revertedPrs.length === 0
+      ? null
+      : Math.round((reverted.size / revertedPrs.length) * 1000) / 10;
+
+  return {
+    window: { days, since },
+    commitCount: commits.length,
+    mergeCount: mergeCommits.length,
+    metrics: {
+      pr_lead_time_hours: {
+        unit: 'hours',
+        definition: 'First commit on the PR branch → merge commit.',
+        ...distribution(prLeadTimes),
+      },
+      issue_to_merge_hours: {
+        unit: 'hours',
+        definition:
+          'First commit referencing the issue → merge commit. A LOWER BOUND: the issue ' +
+          'creation time is not in git history.',
+        ...distribution(issueToMerge),
+      },
+      review_rounds: {
+        unit: 'rounds (proxy)',
+        definition:
+          'Distinct commit subjects on the PR branch. A proxy for review rounds from ' +
+          'git-only data.',
+        ...distribution(reviewRounds),
+      },
+      pr_size_lines: {
+        unit: 'lines changed',
+        definition: 'Added + removed lines in the merge commit.',
+        ...distribution(prSizes),
+      },
+      revert_hotfix_rate: {
+        unit: 'percent',
+        definition: 'Revert commits per merged PR, over the window.',
+        value: revertRate,
+        revertCount: reverted.size,
+        mergedPrCount: revertedPrs.length,
+      },
+      ci_failure_rate: {
+        unit: 'percent (proxy)',
+        definition:
+          'Commits whose subject repeats within the window, over all commits. A proxy for ' +
+          'CI failures — CI results are not in git history.',
+        value: ciFailureRate,
+        fixupCommitCount: fixupCommits.length,
+      },
+    },
+    dora: {
+      available: false,
+      reason:
+        'DORA metrics (deployment frequency, lead time for changes, change failure rate, ' +
+        'time to restore) come from CI/CD and incident history, not from git. The owner ' +
+        'must supply them.',
+    },
+  };
+};
+
+const formatMetric = (metric) => {
+  if (metric.value !== undefined) {
+    return metric.value === null ? 'no data' : `${metric.value}${metric.unit.startsWith('percent') ? '%' : ''}`;
+  }
+  if (metric.count === 0) return 'no data';
+  return `p50 ${metric.p50} · p90 ${metric.p90} · p95 ${metric.p95} (n=${metric.count})`;
+};
+
+const renderMarkdown = (report, repoName, date) => {
+  const lines = [
+    `# Pre-factory baseline — ${repoName}`,
+    '',
+    `**Date:** ${date}  `,
+    `**Window:** ${report.window.days} days (since ${report.window.since})  `,
+    `**Measured on:** the existing human workflow, before any factory output existed  `,
+    `**Source:** git history only — no network, no CI API`,
+    '',
+    '> This is a **reference point, not a control group** (blueprint `14` §9.3). It was measured',
+    '> under different conditions than a factory-assisted run will be. It is the only honest',
+    '> reference point available, and it is measured **once** and never regenerated.',
+    '',
+    '## Metrics',
+    '',
+    '| Metric | Unit | Value | Definition |',
+    '|---|---|---|---|',
+  ];
+  for (const id of METRIC_IDS) {
+    const metric = report.metrics[id];
+    lines.push(`| \`${id}\` | ${metric.unit} | ${formatMetric(metric)} | ${metric.definition} |`);
+  }
+  lines.push(
+    '',
+    '## Coverage',
+    '',
+    `- Commits in window: **${report.commitCount}**`,
+    `- Merge commits: **${report.mergeCount}**`,
+    '',
+    '## Known gaps',
+    '',
+    `- ${report.dora.reason}`,
+    '- `issue_to_merge_hours` is a lower bound (issue creation time is not in git history).',
+    '- `review_rounds` and `ci_failure_rate` are proxies, labelled as such in the table.',
+    '',
+    '## Rules for this file',
+    '',
+    '- It is committed **once**. It is never regenerated, never edited to look better, and never',
+    '  compared against a vendor\'s published figure.',
+    '- Every later factory report states its **baseline, delta, cost and guardrail** (MEAS-03).',
+    '',
+  );
+  return lines.join('\n');
+};
+
+const main = () => {
+  let args;
+  try {
+    args = parseArgs(process.argv.slice(2));
+  } catch (error) {
+    console.error(`baseline: ${error.message}`);
+    console.error(USAGE);
+    process.exit(2);
+  }
+  if (args.help) {
+    console.log(USAGE);
+    return;
+  }
+
+  const repo = resolve(args.repo);
+  try {
+    git(repo, ['rev-parse', '--git-dir']);
+  } catch {
+    console.error(`baseline: ${repo} is not a git repository`);
+    process.exit(1);
+  }
+
+  const date = new Date().toISOString().slice(0, 10);
+  const name = args.name ?? basename(repo);
+  const report = analyse(repo, args.days);
+
+  const outDir = resolve(args.out);
+  mkdirSync(outDir, { recursive: true });
+  const stem = `pre-factory-${date}`;
+  const jsonPath = join(outDir, `${stem}.json`);
+  const mdPath = join(outDir, `${stem}.md`);
+
+  const payload = { repo: name, recordedAt: new Date().toISOString(), ...report };
+  writeFileSync(jsonPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  writeFileSync(mdPath, renderMarkdown(report, name, date), 'utf8');
+
+  console.log(`baseline: ${name}`);
+  console.log(`  json: ${jsonPath}`);
+  console.log(`  md:   ${mdPath}`);
+  for (const id of METRIC_IDS) {
+    console.log(`  ${id}: ${formatMetric(report.metrics[id])}`);
+  }
+  if (report.dora.available === false) {
+    console.log(`  dora:  not available from git — the owner must supply it`);
+  }
+};
+
+main();

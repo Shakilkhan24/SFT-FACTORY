@@ -1,0 +1,52 @@
+# The factory's own repository, registered in the factory's repo allow-list.
+#
+# The GitHub App is installed ONLY on the repos listed here (pack 04 §2.1). Events from
+# any other repo are ignored and logged. This file is the allow-list — it is not a
+# convenience list, it is the boundary of the factory's authority.
+#
+# The repo's build/test/lint/typecheck contract lives in the target repo itself, at
+# `.factory/repo.yml` (pack 03 §4.9). The template is `docs/repo-onboarding.template.yml`.
+#
+# R4: changing this file changes what the factory is allowed to touch.
+
+apiVersion: factory/v1
+kind: RepoRegistryEntry
+metadata:
+  name: software-factory
+spec:
+  repo: <owner>/software-factory
+  defaultBranch: main
+  enabled: true
+
+  # The factory's own repo is the target of the W5+ dogfooding phase (ADR-0015).
+  # Before W5, `enabled: false` — the factory does not act on its own repo until the
+  # manual phase has proven the loop.
+  selfTarget: true
+
+  # The criticality map for this repo. `tier = max(score tier, criticality floor)`.
+  criticalityRef: criticality/software-factory.yaml
+
+  # The onboarding contract, in the repo itself. The factory reads this to learn WHICH
+  # COMMANDS IT MAY RUN — the command set is a capability, not free text (HR-13).
+  onboardingRef: .factory/repo.yml
+
+  # Paths an agent may never write, regardless of the ticket's Build line. This is the
+  # policy-level path deny (pack 03 §4.7 `protectedPaths`), which the scope-guard and
+  # CODEOWNERS enforce independently.
+  protectedPaths:
+    - "definition/**"
+    - "migrations/**"
+    - ".github/**"
+    - "CODEOWNERS"
+    - ".factory/**"
+    - "tests/acceptance/**"
+    - "tests/invariants/**"
+    - "tests/redteam/**"
+    - "packages/policy/**"
+    - "packages/broker/**"
+    - "packages/credentials/**"
+    - "packages/eventlog/**"
+    - "packages/isolation/**"
+    - "packages/approvals/**"
+    - "Dockerfile*"
+    - "docker-compose*.y*ml"

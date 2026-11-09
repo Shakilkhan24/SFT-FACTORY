@@ -1,0 +1,75 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../contracts"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../policy"
+    },
+    {
+      "path": "../state"
+    },
+    {
+      "path": "../context"
+    },
+    {
+      "path": "../broker"
+    },
+    {
+      "path": "../credentials"
+    },
+    {
+      "path": "../gateway"
+    },
+    {
+      "path": "../artefacts"
+    },
+    {
+      "path": "../isolation"
+    },
+    {
+      "path": "../harness"
+    },
+    {
+      "path": "../oracle"
+    },
+    {
+      "path": "../verify"
+    },
+    {
+      "path": "../review"
+    },
+    {
+      "path": "../approvals"
+    },
+    {
+      "path": "../merge"
+    },
+    {
+      "path": "../scm-github"
+    },
+    {
+      "path": "../db"
+    },
+    {
+      "path": "../eventlog"
+    },
+    {
+      "path": "../definition"
+    },
+    {
+      "path": "../calibration"
+    }
+  ]
+}

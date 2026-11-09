@@ -1,0 +1,56 @@
+# RepoOnboarding — the target repo's factory contract.
+#
+# This file is COPIED to `<target-repo>/.factory/repo.yml` by an owner PR (T-0.05).
+# It is the target's build/test/lint/typecheck contract, and it is also what tells the
+# factory WHICH COMMANDS IT MAY RUN. The command set is a capability, not a free-text
+# instruction (HR-13, and the route-inventory test in T-1.14).
+#
+# The placeholders marked <...> are unresolved because owner decision D1 (the target repo)
+# is not yet answered. This template is committed as the reference shape; the copy that
+# lands in the target repo has every placeholder filled in.
+#
+# Schema: pack 03 §4.9.
+
+apiVersion: factory/v1
+kind: RepoOnboarding
+spec:
+  repo: <owner>/<name>
+  defaultBranch: main
+  language: typescript
+
+  # A DIGEST, not a tag. A tag moves; a digest does not. A factory that builds against a
+  # moving image is a factory whose results are not reproducible.
+  image: ghcr.io/<owner>/factory-node@sha256:<digest>
+
+  # Run in T2 only. Argv arrays, never shell strings (AGENTS.md §4).
+  commands:
+    install:   [pnpm, install, --frozen-lockfile]
+    static:    [pnpm, run, lint]
+    typecheck: [pnpm, run, typecheck]
+    test:      [pnpm, run, test]
+    oracle:    [pnpm, vitest, run, "{oraclePath}"]
+    securityScan:
+      - [pnpm, audit, --audit-level, high]
+      - [gitleaks, detect, --no-banner]
+
+  oracle:
+    paths: ["tests/acceptance/**"]
+    generatorKinds: [command-check, behavior-table, file-assertion]
+
+  paths:
+    src: ["src/**"]
+    tests: ["test/**", "tests/**"]
+    publicInterface: ["src/index.ts", "src/api/**"]
+    migrations: ["**/migrations/**"]
+    security: ["src/auth/**"]
+    docs: ["docs/**", "README.md"]
+
+  docs:
+    requiredWhenTag: public-interface
+
+  context:
+    files: ["AGENTS.md", "CLAUDE.md", ".factory/context/*.md"]
+
+  ci:
+    requiredChecks: ["ci/build", "ci/test"]
+    provider: github-actions

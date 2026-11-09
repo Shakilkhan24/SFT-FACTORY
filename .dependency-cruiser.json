@@ -1,0 +1,127 @@
+{
+  "$schema": "https://github.com/sverweij/dependency-cruiser/blob/main/doc/schema.md",
+  "forbidden": [
+    {
+      "name": "pure-packages-have-no-io",
+      "comment": "HR-7 / pack 02 section 3: contracts, core, policy, state, context/assembler, review scorer+panel and merge rules are PURE. No node:fs/net/child_process, no pg, no network, no clock, no randomness except injected.",
+      "from": {
+        "path": "^packages/(contracts|core|policy|state|context|review|merge)/"
+      },
+      "to": {
+        "path": "^(node:)?(fs|net|child_process|dgram|http|https|tls|dns|zlib|worker_threads)$"
+      },
+      "severity": "error"
+    },
+    {
+      "name": "pure-packages-have-no-io-subpaths",
+      "comment": "HR-7: the same ban, including subpath imports such as node:fs/promises.",
+      "from": {
+        "path": "^packages/(contracts|core|policy|state|context|review|merge)/"
+      },
+      "to": {
+        "path": "^(node:)?(fs|net|child_process|dgram|http|https|tls|dns|zlib|worker_threads)/"
+      },
+      "severity": "error"
+    },
+    {
+      "name": "pure-packages-have-no-db-client",
+      "comment": "HR-7: a pure package may not depend on a database driver or the event log.",
+      "from": {
+        "path": "^packages/(contracts|core|policy|state|context|review|merge)/"
+      },
+      "to": {
+        "path": "^packages/(db|eventlog)/"
+      },
+      "severity": "error"
+    },
+    {
+      "name": "pure-packages-no-external-dependencies",
+      "comment": "HR-7: a pure package may not import a third-party module that performs I/O (network clients, fs wrappers, SDK clients).",
+      "from": {
+        "path": "^packages/(contracts|core|policy|state|context|review|merge)/"
+      },
+      "to": {
+        "path": "^(pg|kysely|axios|node-fetch|undici|dockerode|ioredis|redis)$"
+      },
+      "severity": "error"
+    },
+    {
+      "name": "packages-never-import-apps",
+      "comment": "pack 02 section 3: packages never import apps/*.",
+      "from": {
+        "path": "^packages/"
+      },
+      "to": {
+        "path": "^apps/"
+      },
+      "severity": "error"
+    },
+    {
+      "name": "apps-never-import-apps",
+      "comment": "pack 02 section 3: apps/* wire packages together; they do not import each other.",
+      "from": {
+        "path": "^apps/"
+      },
+      "to": {
+        "path": "^apps/"
+      },
+      "severity": "error"
+    },
+    {
+      "name": "contracts-imports-nothing-internal",
+      "comment": "pack 02 section 3: contracts imports nothing internal.",
+      "from": {
+        "path": "^packages/contracts/"
+      },
+      "to": {
+        "path": "^packages/"
+      },
+      "severity": "error"
+    },
+    {
+      "name": "core-only-depends-on-contracts",
+      "comment": "pack 02 section 3: core -> contracts. core depends on no other internal package.",
+      "from": {
+        "path": "^packages/core/"
+      },
+      "to": {
+        "path": "^packages/(?!core/|contracts/)"
+      },
+      "severity": "error"
+    },
+    {
+      "name": "orchestrator-may-not-import-apps",
+      "comment": "pack 02 section 3: orchestrator may import everything except apps.",
+      "from": {
+        "path": "^packages/orchestrator/"
+      },
+      "to": {
+        "path": "^apps/"
+      },
+      "severity": "error"
+    }
+  ],
+  "options": {
+    "doNotFollow": {
+      "path": "node_modules"
+    },
+    "exclude": {
+      "path": "(^|/)(node_modules|dist|coverage|\\.git|build/extract)/"
+    },
+    "tsPreCompilationDeps": true,
+    "enhancedResolveOptions": {
+      "extensions": [
+        ".ts",
+        ".tsx",
+        ".mts",
+        ".js",
+        ".mjs",
+        ".json"
+      ]
+    },
+    "moduleSystems": [
+      "es6",
+      "cjs"
+    ]
+  }
+}

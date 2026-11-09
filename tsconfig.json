@@ -1,0 +1,86 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/contracts"
+    },
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/policy"
+    },
+    {
+      "path": "packages/state"
+    },
+    {
+      "path": "packages/eventlog"
+    },
+    {
+      "path": "packages/db"
+    },
+    {
+      "path": "packages/definition"
+    },
+    {
+      "path": "packages/broker"
+    },
+    {
+      "path": "packages/credentials"
+    },
+    {
+      "path": "packages/gateway"
+    },
+    {
+      "path": "packages/artefacts"
+    },
+    {
+      "path": "packages/isolation"
+    },
+    {
+      "path": "packages/harness"
+    },
+    {
+      "path": "packages/context"
+    },
+    {
+      "path": "packages/oracle"
+    },
+    {
+      "path": "packages/verify"
+    },
+    {
+      "path": "packages/review"
+    },
+    {
+      "path": "packages/approvals"
+    },
+    {
+      "path": "packages/merge"
+    },
+    {
+      "path": "packages/scm-github"
+    },
+    {
+      "path": "packages/calibration"
+    },
+    {
+      "path": "packages/orchestrator"
+    },
+    {
+      "path": "apps/api"
+    },
+    {
+      "path": "apps/worker"
+    },
+    {
+      "path": "apps/cli"
+    },
+    {
+      "path": "apps/dashboard"
+    },
+    {
+      "path": "./tsconfig.tests.json"
+    }
+  ]
+}

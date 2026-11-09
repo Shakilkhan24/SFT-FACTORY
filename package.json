@@ -1,0 +1,41 @@
+{
+  "name": "software-factory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Software Factory \u2014 an autonomous software-production system whose value rests on independent verification, deterministic policy, and human control.",
+  "type": "module",
+  "packageManager": "pnpm@10.8.1",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "ci": "pnpm lint && pnpm typecheck && pnpm lint:deps && pnpm test && pnpm test:acceptance && pnpm test:invariants && pnpm test:redteam",
+    "lint": "eslint .",
+    "lint:deps": "depcruise --config .dependency-cruiser.json .",
+    "typecheck": "tsc --build --verbose",
+    "test": "vitest run tests/unit",
+    "test:acceptance": "vitest run tests/acceptance --passWithNoTests",
+    "test:invariants": "vitest run tests/invariants --passWithNoTests",
+    "test:redteam": "vitest run tests/redteam --passWithNoTests",
+    "test:fault": "vitest run tests/fault --passWithNoTests",
+    "test:concurrency": "vitest run tests/concurrency --passWithNoTests",
+    "test:e2e": "vitest run tests/e2e --passWithNoTests",
+    "test:mutation": "vitest run tests/invariants --mutation",
+    "coverage-check": "node tools/coverage-check.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.15.0",
+    "@types/node": "22.9.0",
+    "dependency-cruiser": "18.7.2",
+    "eslint": "9.15.0",
+    "fast-check": "3.22.0",
+    "typescript": "5.6.3",
+    "typescript-eslint": "8.15.0",
+    "vitest": "2.1.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

@@ -20,6 +20,7 @@ target/
 
 # Local tool state
 .context/
+.worktrees/
 .factory-cache/
 .factory/local/
 *.local.json

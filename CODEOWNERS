@@ -1,0 +1,41 @@
+# CODEOWNERS — the human review floor, expressed as code.
+#
+# pack 02 §3: "R4 = human-only (paths marked R4 above plus `tests/redteam/**`,
+# `tests/invariants/**`, `.github/**`)." pack 05, AGENTS.md HR-5 names the
+# same set.
+#
+# These paths may only be changed by a human. The oracle-guard enforces the
+# oracle subset in CI; CODEOWNERS enforces the rest by requiring an approval
+# from the owner before the PR can merge.
+#
+# The owner is the single reviewer for R4. Replace @OWNER with the real
+# handle before the first PR.
+
+# --- R4: human-only -------------------------------------------------
+/definition/                 @OWNER
+/migrations/                 @OWNER
+/.github/                    @OWNER
+/CODEOWNERS                  @OWNER
+/packages/policy/            @OWNER
+/packages/broker/            @OWNER
+/packages/credentials/       @OWNER
+/packages/eventlog/          @OWNER
+/packages/isolation/         @OWNER
+/packages/approvals/         @OWNER
+/tests/redteam/              @OWNER
+/tests/invariants/           @OWNER
+/tests/acceptance/           @OWNER
+
+# --- R3: read every line --------------------------------------------
+/packages/contracts/         @OWNER
+/packages/state/             @OWNER
+/packages/context/           @OWNER
+/packages/review/            @OWNER
+/packages/merge/             @OWNER
+/packages/gateway/           @OWNER
+/packages/verify/            @OWNER
+/packages/oracle/            @OWNER
+
+# --- The pack is read-only ------------------------------------------
+/software-factory-pack/      @OWNER
+/docs/pack/                  @OWNER

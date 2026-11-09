@@ -1,0 +1,73 @@
+{
+  "repo": "software-factory",
+  "recordedAt": "2026-11-09T12:25:39.941Z",
+  "window": {
+    "days": 90,
+    "since": "2026-08-11T12:25:39.907Z"
+  },
+  "commitCount": 1,
+  "mergeCount": 0,
+  "metrics": {
+    "pr_lead_time_hours": {
+      "unit": "hours",
+      "definition": "First commit on the PR branch → merge commit.",
+      "count": 0,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "min": null,
+      "max": null,
+      "mean": null
+    },
+    "issue_to_merge_hours": {
+      "unit": "hours",
+      "definition": "First commit referencing the issue → merge commit. A LOWER BOUND: the issue creation time is not in git history.",
+      "count": 0,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "min": null,
+      "max": null,
+      "mean": null
+    },
+    "review_rounds": {
+      "unit": "rounds (proxy)",
+      "definition": "Distinct commit subjects on the PR branch. A proxy for review rounds from git-only data.",
+      "count": 0,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "min": null,
+      "max": null,
+      "mean": null
+    },
+    "pr_size_lines": {
+      "unit": "lines changed",
+      "definition": "Added + removed lines in the merge commit.",
+      "count": 0,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "min": null,
+      "max": null,
+      "mean": null
+    },
+    "revert_hotfix_rate": {
+      "unit": "percent",
+      "definition": "Revert commits per merged PR, over the window.",
+      "value": null,
+      "revertCount": 0,
+      "mergedPrCount": 0
+    },
+    "ci_failure_rate": {
+      "unit": "percent (proxy)",
+      "definition": "Commits whose subject repeats within the window, over all commits. A proxy for CI failures — CI results are not in git history.",
+      "value": 0,
+      "fixupCommitCount": 0
+    }
+  },
+  "dora": {
+    "available": false,
+    "reason": "DORA metrics (deployment frequency, lead time for changes, change failure rate, time to restore) come from CI/CD and incident history, not from git. The owner must supply them."
+  }
+}

@@ -1,0 +1,377 @@
+#!/usr/bin/env node
+/**
+ * `tools/context-bundle <ticket>` — assemble the agent's context bundle.
+ *
+ * Pack 05, T-0.03: "concatenates the ticket's `Read` list into
+ * `.context/<ticket>.md`, prints byte size + sha256, and fails above 120 KB."
+ *
+ * The bundle is the agent's ONLY context (pack 07 §3 step 2). Its size is a
+ * hard budget, not a guideline: a ticket whose context exceeds 120 KB is too
+ * big or its `Read` list is sloppy, and the fix is the ticket, not a bigger
+ * budget (pack 07 §8).
+ *
+ * Usage:
+ *   tools/context-bundle T-1.02 [--pack <dir>] [--out <path>] [--max-bytes N]
+ *
+ * The ticket's `Read:` line is parsed out of the pack's ticket backlog. The
+ * `Read` list holds section references like `03 §2` and `blueprint-reference/14 §9`;
+ * a reference that names a whole file (no section) is included whole.
+ *
+ * Read-only with respect to the pack and the repository: the bundle is
+ * written to `.context/`, which is gitignored.
+ */
+
+import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** The context budget from pack 07 §8. */
+export const MAX_BUNDLE_BYTES = 120 * 1024;
+
+const locatePack = (explicit) => {
+  const candidates = explicit
+    ? [explicit]
+    : [
+        join(repoRoot, 'docs', 'pack'),
+        join(repoRoot, 'software-factory-pack', 'software-factory-pack'),
+      ];
+  for (const candidate of candidates) {
+    if (existsSync(join(candidate, '05_TICKET_BACKLOG.md'))) {
+      return candidate;
+    }
+  }
+  return null;
+};
+
+/**
+ * The pack files, by the numbers the pack uses.
+ *
+ * 01..08 are the pack's own files; `blueprint-reference/NN_*` are the
+ * blueprint's. The names are listed explicitly rather than globbed so that a
+ * `Read` reference resolves the same way every time.
+ */
+const PACK_FILES = {
+  '01': '01_MISSION_SCOPE_AND_DECISIONS.md',
+  '02': '02_ARCHITECTURE_SPEC.md',
+  '03': '03_CONTRACTS_AND_DATA_MODEL.md',
+  '04': '04_INTEGRATIONS_AND_API_CATALOG.md',
+  '05': '05_TICKET_BACKLOG.md',
+  '06': '06_MASTER_CHECKLIST_AND_COVERAGE.md',
+  '07': '07_AGENT_OPERATING_MANUAL.md',
+  '08': '08_VERIFICATION_AND_PRODUCTION_READINESS.md',
+  A1: 'A1_STACK_NEUTRALITY_AND_ADAPTERS.md',
+  A2: 'A2_PATH_TO_PEAK_AUTOMATION.md',
+};
+
+const BLUEPRINT_FILES = {
+  '01': '01_EXECUTIVE_VISION.md',
+  '06': '06_REQUIREMENTS_AND_NFRS.md',
+  '07': '07_REFERENCE_ARCHITECTURE.md',
+  '08': '08_AGENT_CATALOG_AND_CONTRACTS.md',
+  '09': '09_ORCHESTRATION_STATE_AND_EVENTS.md',
+  '10': '10_CONTEXT_SKILLS_PROMPTS_AND_MEMORY.md',
+  '11': '11_TOOLS_MCP_AND_INTEGRATIONS.md',
+  '12': '12_END_TO_END_WORKFLOWS.md',
+  '13': '13_SECURITY_GOVERNANCE_AND_HUMAN_CONTROL.md',
+  '14': '14_QUALITY_TESTING_AND_EVALUATION.md',
+  '15': '15_OBSERVABILITY_COST_AND_FEEDBACK.md',
+  '16': '16_IMPLEMENTATION_ROADMAP.md',
+  '17': '17_DOWNSTREAM_BUILD_AGENT_BRIEF.md',
+  '18': '18_OPEN_QUESTIONS_AND_RISKS.md',
+};
+
+/**
+ * The sentinel returned when a ticket exists but declares no `Read:` line.
+ *
+ * A ticket with no Read list has no defined context — the agent would be
+ * left to load whatever it liked, which is exactly the entropy this whole
+ * system exists to prevent. The bundler refuses rather than inventing a
+ * scope.
+ */
+export const NO_READ_LINE = Symbol('no-read-line');
+
+/**
+ * Find a ticket's block in the backlog and return its `Read:` line.
+ *
+ * @param {string} backlog
+ * @param {string} ticket e.g. `T-1.02`
+ * @returns {string|null|symbol} the Read line, `null` if the ticket is not in
+ *   the backlog, or `NO_READ_LINE` if the ticket declares no Read list.
+ */
+export const findTicketReadLine = (backlog, ticket) => {
+  const heading = new RegExp(`^###\\s+${ticket.replace('.', '\\.')}\\b.*$`, 'm');
+  const match = heading.exec(backlog);
+  if (!match) {
+    return null;
+  }
+  const rest = backlog.slice(match.index);
+  const nextHeading = rest.slice(1).search(/\n###\s+/);
+  const block = nextHeading === -1 ? rest : rest.slice(0, nextHeading + 1);
+
+  const read = /^Depends:.*?Read:\s*(.*?)(?:·\s*Satisfies:|$)/m.exec(block);
+  if (read) {
+    return read[1].trim();
+  }
+  // Some tickets put `Read:` on its own line.
+  const own = /^Read:\s*(.*)$/m.exec(block);
+  if (own) {
+    return own[1].trim();
+  }
+  // A ticket with no `Read:` line at all has no defined context. That is a
+  // gap in the ticket, and the bundler must say so rather than guess.
+  return NO_READ_LINE;
+};
+
+/**
+ * Turn a `Read:` value into concrete file references.
+ *
+ * A reference is a **backticked** file reference, optionally with sections:
+ *
+ *   `03 §2`                     → pack file 03, section 2
+ *   `blueprint-reference/14 §9` → blueprint file 14, section 9
+ *   `07 §2–7`                   → pack file 07, sections 2 through 7
+ *   `04 §6, §8`                 → pack file 04, sections 6 and 8
+ *   `14 §5.2, §5.6`             → blueprint file 14, sections 5.2 and 5.6
+ *
+ * The backticks matter. A `Read:` line also names ADRs (`ADR-0008, ADR-0019`),
+ * and those are decisions, not files — matching them as file numbers would
+ * send the bundler looking for a pack file "00" and a blueprint file "19".
+ *
+ * The number alone does not always say which corpus it belongs to: pack files
+ * are 01–08 plus A1/A2, blueprint files are 01–18, and **01, 06, 07 and 08
+ * exist in both**. So:
+ *
+ *   - an explicit `blueprint-reference/` prefix wins;
+ *   - a number in 09–18 is a blueprint file (the pack has no such files);
+ *   - a number in 01–08 is ambiguous and is resolved by trying the pack
+ *     first, then the blueprint — the pack is the more specific corpus for
+ *     those numbers.
+ *
+ * @param {string} readLine
+ * @returns {{ kind: 'pack'|'blueprint', number: string, sections: string[] }[]}
+ */
+export const parseReadList = (readLine) => {
+  if (!readLine) {
+    return [];
+  }
+  const refs = [];
+
+  for (const match of readLine.matchAll(/`([^`]+)`/g)) {
+    const token = match[1].trim();
+    // The pack writes the corpus in three ways: `blueprint-reference/14 §9`,
+    // `blueprint 14 §9`, and a bare `14 §9`.
+    const reference =
+      /^(?:blueprint(?:-reference)?\s*\/?\s*)?(\d{2}|A[12])(?:\s*§\s*(.+))?$/.exec(
+        token,
+      );
+    if (!reference) {
+      continue;
+    }
+    const [, number, sectionList] = reference;
+
+    // `04 §6, §8` — the section list may hold several sections, separated by
+    // commas, each optionally carrying its own `§`.
+    const sections = [];
+    if (sectionList) {
+      for (const part of sectionList.split(',')) {
+        const section = /§?\s*([\d.]+(?:\s*[-–]\s*[\d.]+)?)/.exec(part);
+        if (section) {
+          sections.push(section[1].trim());
+        }
+      }
+    }
+
+    const explicitBlueprint = /^blueprint/i.test(token);
+    const isBlueprintOnly = !explicitBlueprint && Number(number) >= 9 && Number(number) <= 18;
+
+    refs.push({
+      kind: explicitBlueprint || isBlueprintOnly ? 'blueprint' : 'pack',
+      number,
+      sections,
+    });
+  }
+  return refs;
+};
+
+/**
+ * Extract a numbered section's body from a markdown document.
+ *
+ * @param {string} text
+ * @param {string} number e.g. `2` or `4.9`
+ */
+export const extractSection = (text, number) => {
+  const lines = text.split('\n');
+  const heading = new RegExp(`^#{2,4}\\s+(?:§\\s*)?${number.replace('.', '\\.')}\\s*(?:[.·—–-]|\\s|$)`);
+  const startIndex = lines.findIndex((line) => heading.test(line));
+  if (startIndex === -1) {
+    return null;
+  }
+  const level = (lines[startIndex].match(/^#+/) ?? ['##'])[0].length;
+  let endIndex = lines.length;
+  for (let i = startIndex + 1; i < lines.length; i += 1) {
+    const match = /^(#+)\s/.exec(lines[i]);
+    if (match && match[1].length <= level) {
+      endIndex = i;
+      break;
+    }
+  }
+  return lines.slice(startIndex, endIndex).join('\n');
+};
+
+const main = async () => {
+  const argv = process.argv.slice(2);
+  const positional = argv.filter((arg) => !arg.startsWith('--'));
+  const argValue = (flag) => {
+    const index = argv.indexOf(flag);
+    return index === -1 ? undefined : argv[index + 1];
+  };
+
+  const ticket = positional[0];
+  if (!ticket) {
+    console.error('usage: tools/context-bundle <T-x.yy> [--pack <dir>] [--out <path>]');
+    process.exit(2);
+  }
+
+  const packDir = locatePack(argValue('--pack'));
+  if (!packDir) {
+    console.error('FAIL  cannot locate the pack');
+    process.exit(1);
+  }
+
+  const backlog = await readFile(join(packDir, '05_TICKET_BACKLOG.md'), 'utf8');
+  const readLine = findTicketReadLine(backlog, ticket);
+  if (readLine === null) {
+    console.error(`FAIL  ${ticket} is not in the pack's ticket backlog`);
+    process.exit(1);
+  }
+  if (readLine === NO_READ_LINE) {
+    console.error(
+      `FAIL  ${ticket} declares no \`Read:\` list. A ticket with no Read list has no defined context — add one to the pack's ticket backlog rather than letting the agent guess.`,
+    );
+    process.exit(1);
+  }
+
+  const refs = parseReadList(readLine);
+  if (refs.length === 0) {
+    console.error(`FAIL  ${ticket} has no usable Read list (found: ${JSON.stringify(readLine)})`);
+    process.exit(1);
+  }
+
+  const parts = [
+    `# Context bundle — ${ticket}`,
+    '',
+    `Read list: ${readLine}`,
+    '',
+  ];
+  const missing = [];
+
+  /**
+   * Resolve a reference to a file on disk.
+   *
+   * For the ambiguous numbers (01, 06, 07, 08 — present in BOTH corpora) the
+   * pack is tried first and the blueprint second, and the first corpus that
+   * actually contains the requested section wins. A reference is only
+   * "missing" when NEITHER corpus has it, which is the honest failure: it
+   * means the ticket points at something that does not exist.
+   */
+  const resolveRef = async (ref) => {
+    const candidates =
+      ref.kind === 'blueprint'
+        ? [{ kind: 'blueprint', table: BLUEPRINT_FILES, base: join(packDir, 'blueprint-reference') }]
+        : [
+            { kind: 'pack', table: PACK_FILES, base: packDir },
+            { kind: 'blueprint', table: BLUEPRINT_FILES, base: join(packDir, 'blueprint-reference') },
+          ];
+
+    for (const candidate of candidates) {
+      const fileName = candidate.table[ref.number];
+      if (!fileName) {
+        continue;
+      }
+      const path = join(candidate.base, fileName);
+      if (!existsSync(path)) {
+        continue;
+      }
+      const text = await readFile(path, 'utf8');
+      const bodies = [];
+      for (const section of ref.sections) {
+        const [from, to] = section.split(/\s*[-–]\s*/);
+        if (to !== undefined) {
+          const start = Number(from);
+          const end = Number(to);
+          for (let n = start; n <= end; n += 1) {
+            const body = extractSection(text, String(n));
+            if (body !== null) {
+              bodies.push(body);
+            }
+          }
+        } else {
+          const body = extractSection(text, from);
+          if (body !== null) {
+            bodies.push(body);
+          }
+        }
+      }
+      // A whole-file reference, or a reference whose sections all resolved.
+      if (ref.sections.length === 0 || bodies.length > 0) {
+        return { ...candidate, fileName, text, bodies };
+      }
+    }
+    return null;
+  };
+
+  for (const ref of refs) {
+    const resolved = await resolveRef(ref);
+    if (!resolved) {
+      missing.push(
+        `${ref.kind} ${ref.number}${ref.sections.length > 0 ? ` §${ref.sections.join(', §')}` : ''}`,
+      );
+      continue;
+    }
+
+    if (ref.sections.length === 0) {
+      parts.push(
+        `\n---\n\n# FILE: ${resolved.kind} ${ref.number} — ${resolved.fileName}\n`,
+        resolved.text,
+      );
+      continue;
+    }
+
+    parts.push(
+      `\n---\n\n# FILE: ${resolved.kind} ${ref.number} — ${resolved.fileName} §${ref.sections.join(', §')}\n`,
+      resolved.bodies.join('\n\n'),
+    );
+  }
+
+  if (missing.length > 0) {
+    console.error(`FAIL  unresolved Read reference(s): ${missing.join(', ')}`);
+    process.exit(1);
+  }
+
+  const bundle = `${parts.join('\n')}\n`;
+  const bytes = Buffer.byteLength(bundle, 'utf8');
+  const sha256 = createHash('sha256').update(bundle).digest('hex');
+
+  const outPath = argValue('--out') ?? join(repoRoot, '.context', `${ticket}.md`);
+  await mkdir(dirname(outPath), { recursive: true });
+  await writeFile(outPath, bundle, 'utf8');
+
+  console.log(`context-bundle: ${ticket}`);
+  console.log(`  path:  ${outPath}`);
+  console.log(`  bytes: ${bytes}`);
+  console.log(`  sha256: ${sha256}`);
+
+  const maxBytes = Number(argValue('--max-bytes') ?? MAX_BUNDLE_BYTES);
+  if (bytes > maxBytes) {
+    console.error(
+      `FAIL  the bundle is ${bytes} bytes, over the ${maxBytes}-byte budget. The ticket is too big or its Read list is sloppy — fix the ticket, not the budget.`,
+    );
+    process.exit(1);
+  }
+};
+
+await main();

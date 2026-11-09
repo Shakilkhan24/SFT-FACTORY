@@ -1,0 +1,183 @@
+#!/usr/bin/env node
+/**
+ * tools/mining — calibration corpus mining (T-0.06, day-one clock #2).
+ *
+ * Blueprint `14` §5.6: *"Historical mining produces real violations, from real fixes, with the
+ * real context."* The calibration corpus "largely already exists in the git history" (blueprint
+ * `17` §6.1). This tool finds it.
+ *
+ * A mined candidate is a commit that **fixes a bug AND touches tests**. That pairing is the
+ * whole signal: the commit that fixed the bug also wrote the test that proves it, so the diff
+ * between the pre-fix and post-fix trees is a pair of (violation, oracle) — exactly what a
+ * detector needs to be calibrated against.
+ *
+ * Git only. No network. The corpus must be reproducible on a machine that has only the clone.
+ *
+ * Usage:
+ *   tools/mining --repo <path> [--out <file>] [--days 3650] [--min 10]
+ *
+ * Writes JSONL: one candidate per line,
+ *   {"fixSha","preFixSha","testPaths","message","authoredAt"}
+ */
+
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+
+const parseArgs = (argv) => {
+  const args = { repo: process.cwd(), out: 'calibration/candidates.jsonl', days: 3650, min: 10 };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--repo') args.repo = argv[(i += 1)];
+    else if (arg === '--out') args.out = argv[(i += 1)];
+    else if (arg === '--days') args.days = Number(argv[(i += 1)]);
+    else if (arg === '--min') args.min = Number(argv[(i += 1)]);
+    else if (arg === '--help' || arg === '-h') args.help = true;
+    else throw new Error(`unknown argument: ${arg}`);
+  }
+  return args;
+};
+
+const USAGE = `usage: tools/mining --repo <path> [--out <file>] [--days 3650] [--min 10]
+
+  --repo <path>   the repository to mine (default: cwd)
+  --out <file>    the JSONL output path (default: calibration/candidates.jsonl)
+  --days <n>      how far back to look (default: 3650)
+  --min <n>       the minimum number of candidates to mine (default: 10)
+
+A candidate is a commit that fixes a bug AND touches tests. If fewer than --min candidates
+exist, the shortfall is reported rather than padded.
+`;
+
+/**
+ * Run git with an argv array — never a shell string (AGENTS.md §4).
+ */
+const git = (repo, args) =>
+  execFileSync('git', args, {
+    cwd: repo,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+/** Does this path look like a test file? */
+export const isTestPath = (path) => {
+  const p = path.toLowerCase();
+  if (/(^|\/)(test|tests|__tests__|spec|specs)(\/|$)/.test(p)) return true;
+  if (/\.(test|spec)\.[a-z]+$/.test(p)) return true;
+  if (/(^|\/)test_[^/]+\.py$/.test(p)) return true;
+  if (/_test\.(go|py|rb|js|ts)$/.test(p)) return true;
+  return false;
+};
+
+/**
+ * Does the commit message announce a fix?
+ *
+ * The convention-based prefixes are the signal. A commit that fixes a bug says so in its
+ * subject; the subject is the cheapest reliable signal in git history, and a commit whose
+ * message does not say what it does is a commit the corpus cannot use.
+ */
+export const isFixMessage = (subject) => {
+  const s = subject.trim();
+  return /^(fix|bugfix|bug|hotfix|patch|close[sd]?|resolve[sd]?)\b/i.test(s) ||
+    /\bfix(es|ed)?\b/i.test(s) ||
+    /\bbug\b/i.test(s);
+};
+
+/** Does the commit message announce a fix but touch no tests? Those are recorded separately. */
+const touchesTests = (paths) => paths.some(isTestPath);
+
+const main = () => {
+  let args;
+  try {
+    args = parseArgs(process.argv.slice(2));
+  } catch (error) {
+    console.error(`mining: ${error.message}`);
+    console.error(USAGE);
+    process.exit(2);
+  }
+  if (args.help) {
+    console.log(USAGE);
+    return;
+  }
+
+  const repo = resolve(args.repo);
+  try {
+    git(repo, ['rev-parse', '--git-dir']);
+  } catch {
+    console.error(`mining: ${repo} is not a git repository`);
+    process.exit(1);
+  }
+
+  const since = new Date(Date.now() - args.days * 24 * 60 * 60 * 1000).toISOString();
+  const raw = git(repo, ['log', `--since=${since}`, '--format=%H%x00%at%x00%s%x00%b%x1e']);
+  const commits = [];
+  for (const record of raw.split('\x1e')) {
+    const trimmed = record.trim();
+    if (trimmed === '') continue;
+    const [hash, at, subject, body] = trimmed.split('\x00');
+    if (!hash) continue;
+    commits.push({ hash, at: Number(at), subject: subject ?? '', body: body ?? '' });
+  }
+
+  const candidates = [];
+  const fixesWithoutTests = [];
+  const touchedTestCommits = [];
+
+  for (const commit of commits) {
+    const names = git(repo, ['show', '--name-only', '--format=', commit.hash])
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '');
+    if (names.length === 0) continue;
+
+    const testPaths = names.filter(isTestPath);
+    const fix = isFixMessage(commit.subject);
+
+    if (fix && testPaths.length > 0) {
+      // The pre-fix tree is the commit's first parent. The pair
+      // (preFixSha → fixSha) is the violation/oracle pair the corpus needs.
+      const parents = git(repo, ['rev-list', '--parents', '-n', '1', commit.hash])
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      const preFixSha = parents[1] ?? null;
+      candidates.push({
+        fixSha: commit.hash,
+        preFixSha,
+        testPaths,
+        message: commit.subject,
+        authoredAt: new Date(commit.at * 1000).toISOString(),
+        changedPaths: names,
+      });
+    } else if (fix) {
+      fixesWithoutTests.push({ sha: commit.hash, message: commit.subject });
+    } else if (testPaths.length > 0) {
+      touchedTestCommits.push({ sha: commit.hash, message: commit.subject });
+    }
+  }
+
+  const outPath = resolve(args.out);
+  mkdirSync(dirname(outPath), { recursive: true });
+  const lines = candidates.map((c) => JSON.stringify(c)).join('\n');
+  writeFileSync(outPath, lines === '' ? '' : `${lines}\n`, 'utf8');
+
+  console.log('mining: calibration candidates');
+  console.log(`  out:            ${outPath}`);
+  console.log(`  commits seen:   ${commits.length}`);
+  console.log(`  candidates:     ${candidates.length}`);
+  console.log(`  fixes w/o tests:${fixesWithoutTests.length} (not candidates — no oracle to pair with)`);
+  console.log(`  test-only:      ${touchedTestCommits.length}`);
+
+  if (candidates.length < args.min) {
+    console.error(
+      `SHORTFALL  mined ${candidates.length} candidates, below the required ${args.min}. ` +
+        `The corpus is not usable yet — mine a longer window (--days) or more history. ` +
+        `Do NOT pad the corpus with synthetic samples to reach the count; a synthetic sample ` +
+        `does not calibrate against real context.`,
+    );
+    process.exitCode = 1;
+  }
+};
+
+main();

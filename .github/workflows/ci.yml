@@ -1,0 +1,171 @@
+name: ci
+
+# The factory's own CI. Every check here is a REQUIRED check on the factory's
+# own repository — a PR cannot merge without them.
+#
+# The two guard checks (oracle-guard, scope-guard) are the trust boundary
+# (pack 05, T-0.03). They are separate jobs, not a step, so that a failure
+# names the guard that failed rather than "CI failed".
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The oracle-guard needs the commit list to decide whether a commit
+          # is human-authored, so the history must be present.
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Dependency rules
+        run: pnpm lint:deps
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Acceptance tests
+        run: pnpm test:acceptance
+
+      - name: Invariant tests
+        run: pnpm test:invariants
+
+      - name: Red-team tests
+        run: pnpm test:redteam
+
+      - name: Requirement coverage
+        run: pnpm coverage-check
+
+  oracle-guard:
+    name: oracle-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Collect changed paths
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+            git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" \
+              > "$RUNNER_TEMP/changed-paths.txt"
+          else
+            git diff --name-only HEAD~1 HEAD > "$RUNNER_TEMP/changed-paths.txt"
+          fi
+          echo "paths=$(wc -l < "$RUNNER_TEMP/changed-paths.txt")" >> "$GITHUB_OUTPUT"
+
+      - name: Detect human authorship
+        id: authorship
+        env:
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          # A commit is human-authored when it carries a VERIFIED signature.
+          # An unsigned or unverified commit is not evidence of authorship.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags origin "${{ github.event.pull_request.head.sha }}"
+            if git log --format='%G?' "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
+                 | grep -qv '^U$'; then
+              echo "human=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "human=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "human=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run oracle-guard
+        env:
+          CHANGED_PATHS: ${{ steps.changed.outputs.paths }}
+          HUMAN_AUTHORED: ${{ steps.authorship.outputs.human }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          CHANGED_PATHS="$(cat "$RUNNER_TEMP/changed-paths.txt")"
+          export CHANGED_PATHS
+          node tools/oracle-guard.ts
+
+  scope-guard:
+    name: scope-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run scope-guard
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          CHANGED_PATHS="$(git diff --name-only HEAD~1 HEAD)"
+          export CHANGED_PATHS
+          node tools/scope-guard.ts
