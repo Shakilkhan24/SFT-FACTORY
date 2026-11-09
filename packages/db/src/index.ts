@@ -27,7 +27,17 @@ export {
 
 // The Kysely handle type is re-exported so that a consumer does not need a
 // direct dependency on `kysely` just to name the type of a database handle.
-export type { Kysely } from 'kysely';
+//
+// `Transaction` is re-exported for the same reason and because the event
+// log's `appendInTransaction` takes one: a state change and its event must
+// be written in **one** transaction (checklist 02 trap 4), so the caller
+// opens the transaction and hands it to both.
+export type { Kysely, Transaction } from 'kysely';
+
+// `sql` is the raw-SQL template tag. The event log needs it because the
+// append algorithm uses `FOR UPDATE`, `RETURNING` and `pg_notify` — none of
+// which the query builder expresses.
+export { sql } from 'kysely';
 
 export {
   MIGRATION_LEDGER,

@@ -11,6 +11,7 @@
 
 import { runDbCommand } from './db.js';
 import { defaultMigrationsDir } from './db.js';
+import { runEventsCommand } from './events.js';
 
 const USAGE = `usage: factory <command> [options]
 
@@ -21,8 +22,16 @@ commands:
                          list the event-log partitions; --ensure creates the
                          monthly partitions ahead of time
 
+  events list [count] [aggregateId]
+                         show the most recent events
+  events show <aggregateId>
+                         show one aggregate's chain and its chain verdict
+  events health          report seq gaps and aggregate-version gaps
+
 environment:
   FACTORY_OWNER_DATABASE_URL   connection string for the factory_owner role
+  FACTORY_PROJECTOR_DATABASE_URL
+                               connection string for the factory_projector role
   FACTORY_MIGRATIONS_DIR       override the migrations directory
 `;
 
@@ -93,6 +102,40 @@ export const run = async (
         connectionString,
         migrationsDir: defaultMigrationsDir(),
         mode: ownerRoleMode(environment),
+      },
+      subArgs,
+    );
+  }
+
+  if (command === 'events') {
+    const [subcommand, ...subArgs] = rest;
+    if (subcommand === undefined) {
+      return {
+        lines: ['usage: factory events list | show | health'],
+        exitCode: 2,
+      };
+    }
+    // The event log is read through the **projector** role: it may read the
+    // log and may not write it. Using it here means the CLI exercises the
+    // same privilege boundary the running system does.
+    const connectionString =
+      environment['FACTORY_PROJECTOR_DATABASE_URL'] ??
+      environment['FACTORY_OWNER_DATABASE_URL'];
+    if (connectionString === undefined) {
+      return {
+        lines: [
+          'FACTORY_PROJECTOR_DATABASE_URL is not set.',
+          'The events commands read the log through the factory_projector role.',
+        ],
+        exitCode: 2,
+      };
+    }
+    return runEventsCommand(
+      subcommand,
+      {
+        connectionString,
+        mode: ownerRoleMode(environment),
+        role: 'factory_projector',
       },
       subArgs,
     );

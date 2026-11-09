@@ -10,5 +10,10 @@
   },
   "scripts": {
     "typecheck": "tsc --build"
+  },
+  "dependencies": {
+    "@factory/contracts": "workspace:*",
+    "@factory/core": "workspace:*",
+    "@factory/db": "workspace:*"
   }
 }
