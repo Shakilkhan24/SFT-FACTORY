@@ -117,11 +117,16 @@ export const createEventLogHarness = async (
  * an event about a task therefore needs the task to exist first — and that
  * creation is *not* an event (a task row is created by the intake path,
  * which T-1.04 owns).
+ *
+ * The initial state is `DRAFT` — the first of the 19 task states
+ * (blueprint `09` §2.1), and the state a task starts in. It is a real
+ * state, not a placeholder: the state machine's table has no edge into it,
+ * because a task row *is* the record of the intent having been recorded.
  */
 export const insertTask = async (
   db: Kysely<FactoryDatabase>,
   taskId: string,
-  overrides: { readonly version?: number } = {},
+  overrides: { readonly version?: number; readonly state?: string } = {},
 ): Promise<void> => {
   await db
     .insertInto('tasks')
@@ -129,7 +134,7 @@ export const insertTask = async (
       id: taskId,
       repo: 'org/repo',
       workflow: 'wf_test',
-      state: 'INTAKE',
+      state: overrides.state ?? 'DRAFT',
       version: overrides.version ?? 0,
       autonomy_level: 2,
       risk_tier: 'R0',

@@ -323,13 +323,30 @@ export class PostgresEventLog implements EventLog {
       const key = versionKey(kind, id);
       const binding = bindingFor(kind);
 
-      if (binding.versioned) {
+      // `bumpsVersion` says whether the event changes its aggregate's state.
+      // A read-only event appended in the same transaction must not consume
+      // a version number — otherwise the version no longer lines up with the
+      // number of state changes, and the "exactly-once state transition"
+      // guarantee (blueprint `09` §6) stops holding.
+      //
+      // An event that does not set the flag is treated as a state change:
+      // the flag defaults to "yes", so an event that forgets to say otherwise
+      // still bumps. That is the safe direction — a missing bump would let
+      // two writers both believe they changed the state.
+      const bumps = event.bumpsVersion !== false;
+
+      if (binding.versioned && bumps) {
         const expected = batchVersions.has(key)
           ? batchVersions.get(key)
           : opts?.expectedVersions?.[key];
         const version = await this.bumpAggregateVersion(trx, binding, id, expected);
         batchVersions.set(key, version);
         versions.push(version);
+      } else if (binding.versioned) {
+        // The aggregate's version is unchanged, so the event records the
+        // version the aggregate is currently at.
+        const current = batchVersions.get(key) ?? opts?.expectedVersions?.[key];
+        versions.push(current ?? event.aggregate.version);
       } else {
         // Not versioned: the event records the version the caller asserted.
         versions.push(event.aggregate.version);
