@@ -58,12 +58,12 @@
     },
     {
       "name": "apps-never-import-apps",
-      "comment": "pack 02 section 3: apps/* wire packages together; they do not import each other.",
+      "comment": "pack 02 section 3: apps/* wire packages together; they do not import each other. An app MAY import its OWN modules — `$1` is the source app's name, so only a DIFFERENT app is forbidden.",
       "from": {
-        "path": "^apps/"
+        "path": "^apps/([^/]+)/"
       },
       "to": {
-        "path": "^apps/"
+        "path": "^apps/(?!$1/)"
       },
       "severity": "error"
     },

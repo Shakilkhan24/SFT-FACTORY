@@ -292,4 +292,35 @@ describe('T-0.02 — dependency rules bite', () => {
       },
     );
   }, 120_000);
+
+  it('A0.5 — an app importing its OWN module PASSES the deps rule', async () => {
+    // The other half of the app-to-app rule. Without this, a rule that
+    // rejects everything is indistinguishable from a correct rule — and the
+    // factory's own CLI would be unbuildable, because an app is made of
+    // modules that import each other.
+    await withScratch(
+      [
+        {
+          dir: 'apps/cli',
+          name: '@factory/cli',
+          source: [
+            "import { helper } from './helper.js';",
+            '',
+            'export const n = helper;',
+            '',
+          ].join('\n'),
+        },
+        {
+          dir: 'apps/cli/helper.ts',
+          name: '@factory/cli/helper',
+          source: ['export const helper = "helper";', ''].join('\n'),
+        },
+      ],
+      async (root) => {
+        const result = await cruise(root);
+
+        expect(result.output).not.toContain('apps-never-import-apps');
+      },
+    );
+  }, 120_000);
 });

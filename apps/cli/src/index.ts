@@ -1,8 +1,116 @@
 /**
- * `cli` — scaffolded in checklist 01 (T-0.02).
+ * `cli` — the factory's command line (pack 04 §"Command catalogue").
  *
- * apps/* wire packages together; they never import each other
- * (pack 02 §3).
+ * This ticket delivers the `factory db` command group (checklist 02, T-1.02).
+ * The rest of the catalogue arrives with the tickets that own the commands;
+ * each is added here as a new subcommand, and the table stays the single
+ * place that says what exists.
+ *
+ * The CLI never imports another app (pack 02 §3) — it wires packages together.
  */
 
-export const appName = 'cli';
+import { runDbCommand } from './db.js';
+import { defaultMigrationsDir } from './db.js';
+
+const USAGE = `usage: factory <command> [options]
+
+commands:
+  db migrate             apply every pending migration
+  db status              show which migrations are applied
+  db partitions [--ensure [months]]
+                         list the event-log partitions; --ensure creates the
+                         monthly partitions ahead of time
+
+environment:
+  FACTORY_OWNER_DATABASE_URL   connection string for the factory_owner role
+  FACTORY_MIGRATIONS_DIR       override the migrations directory
+`;
+
+export interface CliResult {
+  readonly lines: readonly string[];
+  readonly exitCode: number;
+}
+
+/**
+ * The connection string the CLI uses for owner-role work.
+ *
+ * Only the owner role is read here. The runtime roles have their own
+ * environment variables (`FACTORY_APP_DATABASE_URL` and friends) and are used
+ * by the components that need them — not by the CLI's migration path.
+ */
+const ownerConnectionString = (
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined => environment['FACTORY_OWNER_DATABASE_URL'];
+
+/**
+ * How the owner role is assumed.
+ *
+ * `FACTORY_DB_ROLE_MODE=assume` makes the CLI log in with the given
+ * connection string and then `SET ROLE factory_owner`. The dev cluster uses
+ * this: its `factory_owner` is a NOLOGIN group role, and the migration tables
+ * must be owned by it. Production connects as the role directly and does not
+ * set the variable.
+ */
+const ownerRoleMode = (
+  environment: NodeJS.ProcessEnv = process.env,
+): 'direct' | 'assume' =>
+  environment['FACTORY_DB_ROLE_MODE'] === 'assume' ? 'assume' : 'direct';
+
+/**
+ * Run the CLI with an argument vector (without `node` and the script path).
+ */
+export const run = async (
+  argv: readonly string[],
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<CliResult> => {
+  const [command, ...rest] = argv;
+
+  if (command === undefined || command === '--help' || command === '-h' || command === 'help') {
+    return { lines: USAGE.trimEnd().split('\n'), exitCode: command === undefined ? 2 : 0 };
+  }
+
+  if (command === 'db') {
+    const [subcommand, ...subArgs] = rest;
+    if (subcommand === undefined) {
+      return {
+        lines: ['usage: factory db migrate | status | partitions'],
+        exitCode: 2,
+      };
+    }
+    const connectionString = ownerConnectionString(environment);
+    if (connectionString === undefined) {
+      return {
+        lines: [
+          'FACTORY_OWNER_DATABASE_URL is not set.',
+          'The db commands run as the owner role (it owns the schema and may create partitions).',
+        ],
+        exitCode: 2,
+      };
+    }
+    return runDbCommand(
+      subcommand,
+      {
+        connectionString,
+        migrationsDir: defaultMigrationsDir(),
+        mode: ownerRoleMode(environment),
+      },
+      subArgs,
+    );
+  }
+
+  return {
+    lines: [`unknown command \`factory ${command}\``, '', USAGE.trimEnd()],
+    exitCode: 2,
+  };
+};
+
+/**
+ * The process entry point.
+ */
+export const main = async (): Promise<void> => {
+  const result = await run(process.argv.slice(2));
+  for (const line of result.lines) {
+    console.log(line);
+  }
+  process.exitCode = result.exitCode;
+};

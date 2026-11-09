@@ -41,6 +41,8 @@ export default tseslint.config(
       'tools/oracle-guard.ts',
       'tools/context-bundle',
       'tools/export-schemas.ts',
+      'tools/extract-pack-ddl.ts',
+      'apps/cli/src/index.ts',
     ],
     languageOptions: {
       globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly' },
