@@ -99,7 +99,20 @@ importers:
         specifier: 8.11.10
         version: 8.11.10
 
-  packages/definition: {}
+  packages/definition:
+    dependencies:
+      '@factory/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../core
+      '@factory/policy':
+        specifier: workspace:*
+        version: link:../policy
+      js-yaml:
+        specifier: 4.1.0
+        version: 4.1.0
 
   packages/eventlog:
     dependencies:
@@ -138,7 +151,14 @@ importers:
         specifier: workspace:*
         version: link:../state
 
-  packages/policy: {}
+  packages/policy:
+    dependencies:
+      '@factory/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/review: {}
 

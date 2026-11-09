@@ -1,0 +1,13 @@
+apiVersion: factory/v1
+kind: PolicyBundle
+spec:
+  denyRules:
+    - { id: deny-factory-write,       when: { capability: factory.write } }
+    - { id: deny-protected-merge,     when: { capability: git.push.protected, autonomyBelow: 3 } }
+    - { id: deny-secret-read-agent,   when: { capability: secret.read, actorKind: agent } }
+    - { id: deny-agent-protected-paths, when: { action: repo.write, actorKind: agent, pathsMatch: "@protectedPaths" } }
+    - { id: deny-egress-private,      when: { action: net.egress, hostClass: [private, loopback, linkLocal, metadata] } }
+  protectedPaths: [ ".github/**", "CODEOWNERS", ".factory/**", "tests/acceptance/**", "**/migrations/**", "Dockerfile*", "docker-compose*.y*ml" ]
+  effectRules: { E0: allow, E1: allow, E2: allowIfResourceScoped, E3: requireApproval, E4: requireApproval }
+  tierRules:   { R3: { approveActions: requireApproval-security }, R4: { agentChange: deny } }
+  default: deny
