@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scheduler.stage-input.json",
+  "title": "scheduler.stage-input",
+  "description": "Contract from pack 03 §3 scheduling.",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nodeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "spec": {},
+    "context": {
+      "type": "object",
+      "properties": {
+        "envelopeId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "trust": {
+                "type": "string",
+                "enum": [
+                  "trusted",
+                  "untrusted-content",
+                  "derived"
+                ]
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "id",
+              "version",
+              "sha256",
+              "trust",
+              "bytes"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "resolvedContextSha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "truncations": {
+          "type": "array",
+          "items": {
+            "not": {}
+          }
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "expected": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "expected",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "bytes",
+            "limit"
+          ],
+          "additionalProperties": false
+        },
+        "rendered": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "envelopeId",
+        "items",
+        "resolvedContextSha256",
+        "truncations",
+        "gaps",
+        "budget",
+        "rendered"
+      ],
+      "additionalProperties": false
+    },
+    "grant": {
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "resourceScope": {
+          "type": "object",
+          "properties": {
+            "repo": {
+              "type": "string"
+            },
+            "paths": {
+              "type": "object",
+              "properties": {
+                "writeGlobs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": []
+                },
+                "denyGlobs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": []
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "capabilities",
+        "scopes"
+      ],
+      "additionalProperties": false
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "maxUsdMicros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxTurns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wallClockSeconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "maxUsdMicros",
+        "wallClockSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "upstream": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "kind",
+        "uri"
+      ],
+      "additionalProperties": false
+    },
+    "modelPolicy": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "taskId",
+    "nodeId",
+    "attempt",
+    "runId",
+    "spec",
+    "context",
+    "grant",
+    "budget",
+    "modelPolicy"
+  ],
+  "additionalProperties": false
+}

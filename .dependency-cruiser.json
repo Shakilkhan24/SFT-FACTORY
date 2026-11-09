@@ -69,12 +69,12 @@
     },
     {
       "name": "contracts-imports-nothing-internal",
-      "comment": "pack 02 section 3: contracts imports nothing internal.",
+      "comment": "pack 02 section 3: contracts imports nothing internal. `contracts` may import its OWN modules — the rule forbids it depending on any OTHER package, not on itself.",
       "from": {
         "path": "^packages/contracts/"
       },
       "to": {
-        "path": "^packages/"
+        "path": "^packages/(?!contracts/)"
       },
       "severity": "error"
     },

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "oracle.oracle.json",
+  "title": "oracle.oracle",
+  "description": "Contract from pack 03 §3 verification.",
+  "type": "object",
+  "properties": {
+    "oracleId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "route": {
+      "type": "string",
+      "enum": [
+        "human",
+        "generated",
+        "agent"
+      ]
+    },
+    "manifestSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "implementationRunId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "objectUri": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "oracleId",
+    "taskId",
+    "route",
+    "manifestSha256",
+    "implementationRunId",
+    "objectUri"
+  ],
+  "additionalProperties": false
+}

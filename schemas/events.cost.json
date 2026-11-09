@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "events.cost.json",
+  "title": "events.cost",
+  "description": "Contract from pack 09 §4.1.",
+  "type": "object",
+  "properties": {
+    "tokensIn": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tokensOut": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "usd": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "tokensIn",
+    "tokensOut",
+    "usd"
+  ],
+  "additionalProperties": false
+}

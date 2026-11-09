@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "definition.factory.json",
+  "title": "definition.factory",
+  "description": "Contract from pack 03 §4.1.",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "const": "factory/v1"
+    },
+    "kind": {
+      "const": "FactoryDefinition"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "oracleId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "object",
+          "properties": {
+            "githubLogin": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "githubLogin"
+          ],
+          "additionalProperties": false
+        },
+        "global": {
+          "type": "object",
+          "properties": {
+            "maxConcurrentTasks": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "killSwitch": {
+              "type": "object",
+              "properties": {
+                "honour": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "honour"
+              ],
+              "additionalProperties": false
+            },
+            "dailyBudgetUsdMicros": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "defaults": {
+          "type": "object",
+          "properties": {
+            "autonomyLevel": {
+              "anyOf": [
+                {
+                  "const": 0
+                },
+                {
+                  "const": 1
+                },
+                {
+                  "const": 2
+                },
+                {
+                  "const": 3
+                },
+                {
+                  "const": 4
+                }
+              ]
+            },
+            "gateRetryBudget": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "taskBudgetUsdMicros": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "repos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "ref"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "owner",
+        "global"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "additionalProperties": false
+}

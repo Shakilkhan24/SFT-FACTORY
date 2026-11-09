@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.node-id.json",
+  "title": "shared.node-id",
+  "description": "Contract from pack 03 §1 IDs.",
+  "type": "string",
+  "minLength": 1,
+  "maxLength": 64,
+  "pattern": "^[a-z0-9][a-z0-9-]*$"
+}

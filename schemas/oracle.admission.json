@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "oracle.admission.json",
+  "title": "oracle.admission",
+  "description": "Contract from pack 03 §3 verification.",
+  "type": "object",
+  "properties": {
+    "oracleId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "beforeReportSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "perCheck": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observed": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "expected",
+          "observed"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "oracleId",
+    "beforeReportSha256",
+    "perCheck"
+  ],
+  "additionalProperties": false
+}

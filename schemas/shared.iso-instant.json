@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.iso-instant.json",
+  "title": "shared.iso-instant",
+  "description": "Contract from pack 03 §1 Time.",
+  "type": "string"
+}

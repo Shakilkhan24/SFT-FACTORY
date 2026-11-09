@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review.output.json",
+  "title": "review.output",
+  "description": "Contract from pack 03 §3 review.",
+  "type": "object",
+  "properties": {
+    "reviewerId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "approve",
+        "reject",
+        "comment"
+      ]
+    },
+    "rationale": {
+      "type": "string",
+      "default": ""
+    },
+    "blocking": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "reviewerId",
+    "role",
+    "outcome"
+  ],
+  "additionalProperties": false
+}

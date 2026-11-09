@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.usd-micros.json",
+  "title": "shared.usd-micros",
+  "description": "Contract from pack 03 §3 shared.",
+  "type": "integer",
+  "minimum": 0
+}

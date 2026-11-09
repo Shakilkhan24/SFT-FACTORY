@@ -9,10 +9,12 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "ci": "pnpm lint && pnpm typecheck && pnpm lint:deps && pnpm test && pnpm test:acceptance && pnpm test:invariants && pnpm test:redteam",
+    "ci": "pnpm lint && pnpm typecheck && pnpm lint:deps && pnpm schemas:check && pnpm test && pnpm test:acceptance && pnpm test:invariants && pnpm test:redteam",
     "lint": "eslint .",
     "lint:deps": "depcruise --config .dependency-cruiser.json .",
     "typecheck": "tsc --build --verbose",
+    "schemas": "pnpm typecheck && node tools/export-schemas.ts",
+    "schemas:check": "pnpm typecheck && node tools/export-schemas.ts --check",
     "test": "vitest run tests/unit",
     "test:acceptance": "vitest run tests/acceptance --passWithNoTests",
     "test:invariants": "vitest run tests/invariants --passWithNoTests",
@@ -25,10 +27,12 @@
   },
   "devDependencies": {
     "@eslint/js": "9.15.0",
+    "@types/js-yaml": "4.0.9",
     "@types/node": "22.9.0",
     "dependency-cruiser": "18.7.2",
     "eslint": "9.15.0",
     "fast-check": "3.22.0",
+    "js-yaml": "4.1.0",
     "typescript": "5.6.3",
     "typescript-eslint": "8.15.0",
     "vitest": "2.1.5"

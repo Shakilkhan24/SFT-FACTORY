@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "policy.prior-denial.json",
+  "title": "policy.prior-denial",
+  "description": "Contract from pack 03 §3 policy (AT-14).",
+  "type": "object",
+  "properties": {
+    "effectClass": {
+      "type": "string",
+      "enum": [
+        "E0",
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ]
+    },
+    "resourceKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilityId": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "effectClass",
+    "resourceKey",
+    "capabilityId"
+  ],
+  "additionalProperties": false
+}

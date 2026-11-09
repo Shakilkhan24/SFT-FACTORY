@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "definition.role.json",
+  "title": "definition.role",
+  "description": "Contract from pack 03 §4.3.",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "const": "factory/v1"
+    },
+    "kind": {
+      "const": "RoleSpec"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "responsibility": {
+          "type": "string"
+        },
+        "contextScope": {
+          "type": "object",
+          "properties": {
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "default": []
+            },
+            "exclude": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        },
+        "toolScope": {
+          "type": "object",
+          "properties": {
+            "grant": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "default": []
+            },
+            "deny": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        },
+        "modelPolicy": {
+          "type": "object",
+          "properties": {
+            "class": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fallbacks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "default": []
+            }
+          },
+          "required": [
+            "class"
+          ],
+          "additionalProperties": false
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "turns": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "wallClockSeconds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "costBudgetUsdMicros": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "contextBudgetBytes": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "autonomy": {
+          "type": "object",
+          "properties": {
+            "maxLevel": {
+              "anyOf": [
+                {
+                  "const": 0
+                },
+                {
+                  "const": 1
+                },
+                {
+                  "const": 2
+                },
+                {
+                  "const": 3
+                },
+                {
+                  "const": 4
+                }
+              ]
+            }
+          },
+          "required": [
+            "maxLevel"
+          ],
+          "additionalProperties": false
+        },
+        "spawning": {
+          "type": "object",
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "allowed"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "responsibility",
+        "contextScope",
+        "toolScope",
+        "modelPolicy",
+        "limits",
+        "autonomy",
+        "spawning"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "additionalProperties": false
+}

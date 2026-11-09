@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "events.payload.policy-denied.json",
+  "title": "events.payload.policy-denied",
+  "description": "Contract from pack 03 §5, 09 §4.4.",
+  "type": "object",
+  "properties": {
+    "decisionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ruleIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "decisionId",
+    "action",
+    "ruleIds",
+    "reason"
+  ],
+  "additionalProperties": false
+}

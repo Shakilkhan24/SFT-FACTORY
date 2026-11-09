@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "context.task-inputs.json",
+  "title": "context.task-inputs",
+  "description": "Contract from pack 03 §3 context.",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "type": "string",
+      "minLength": 1
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "spec": {}
+  },
+  "required": [
+    "taskId",
+    "workflow",
+    "stage",
+    "role"
+  ],
+  "additionalProperties": false
+}

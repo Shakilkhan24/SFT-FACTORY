@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.event-id.json",
+  "title": "shared.event-id",
+  "description": "Contract from pack 03 §1 IDs.",
+  "type": "string"
+}

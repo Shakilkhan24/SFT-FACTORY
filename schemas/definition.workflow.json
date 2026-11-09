@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "definition.workflow.json",
+  "title": "definition.workflow",
+  "description": "Contract from pack 03 §4.2.",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "const": "factory/v1"
+    },
+    "kind": {
+      "const": "WorkflowDefinition"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "autonomy": {
+          "type": "object",
+          "properties": {
+            "level": {
+              "anyOf": [
+                {
+                  "const": 0
+                },
+                {
+                  "const": 1
+                },
+                {
+                  "const": 2
+                },
+                {
+                  "const": 3
+                },
+                {
+                  "const": 4
+                }
+              ]
+            },
+            "ceiling": {
+              "anyOf": [
+                {
+                  "const": 0
+                },
+                {
+                  "const": 1
+                },
+                {
+                  "const": 2
+                },
+                {
+                  "const": 3
+                },
+                {
+                  "const": 4
+                }
+              ]
+            }
+          },
+          "required": [
+            "level",
+            "ceiling"
+          ],
+          "additionalProperties": false
+        },
+        "trigger": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "event",
+                "manual",
+                "schedule"
+              ]
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1
+            },
+            "event": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "requesterAllowList": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        "planApproval": {
+          "type": "string",
+          "enum": [
+            "required",
+            "not_required"
+          ]
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "specify",
+                  "plan",
+                  "implement",
+                  "verify",
+                  "review",
+                  "aggregate",
+                  "approve",
+                  "merge",
+                  "deploy",
+                  "sweep",
+                  "investigate",
+                  "record",
+                  "evaluate",
+                  "propose"
+                ]
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "triage",
+                  "refinement",
+                  "oracle-author",
+                  "planner",
+                  "worker",
+                  "reviewer",
+                  "reviewer-quality",
+                  "security-reviewer",
+                  "sweep",
+                  "ci-repair"
+                ]
+              },
+              "executor": {
+                "type": "string",
+                "enum": [
+                  "deterministic",
+                  "completion",
+                  "harness",
+                  "human"
+                ]
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "whenRoute": {
+                "type": "string",
+                "enum": [
+                  "human",
+                  "generated",
+                  "agent"
+                ]
+              },
+              "approval": {
+                "type": "string",
+                "enum": [
+                  "plan",
+                  "merge",
+                  "definition",
+                  "temporary-grant"
+                ]
+              },
+              "isolation": {
+                "type": "string",
+                "enum": [
+                  "T1",
+                  "T2"
+                ]
+              },
+              "requireDifferentModel": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "kind"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "maxConcurrent": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reworkLoops": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxWallClockSeconds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxUsdMicrosPerTask": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "completion": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "autonomy",
+        "trigger"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "additionalProperties": false
+}

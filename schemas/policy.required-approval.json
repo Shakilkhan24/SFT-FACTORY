@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "policy.required-approval.json",
+  "title": "policy.required-approval",
+  "description": "Contract from pack 03 §3 policy.",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "const": "security"
+    }
+  },
+  "required": [
+    "type"
+  ],
+  "additionalProperties": false
+}

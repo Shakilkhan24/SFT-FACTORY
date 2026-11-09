@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "state.node-state.json",
+  "title": "state.node-state",
+  "description": "Contract from pack 03 §6.",
+  "type": "string",
+  "enum": [
+    "PENDING",
+    "READY",
+    "LEASED",
+    "RUNNING",
+    "SUCCEEDED",
+    "FAILED",
+    "INCOMPLETE",
+    "BLOCKED"
+  ]
+}

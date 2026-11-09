@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "definition.task-graph.json",
+  "title": "definition.task-graph",
+  "description": "Contract from pack 03 §4.11.",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "const": "factory/v1"
+    },
+    "kind": {
+      "const": "TaskGraph"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "taskId"
+      ],
+      "additionalProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "specify",
+                  "plan",
+                  "implement",
+                  "verify",
+                  "review",
+                  "aggregate",
+                  "approve",
+                  "merge",
+                  "deploy",
+                  "sweep",
+                  "investigate",
+                  "record",
+                  "evaluate",
+                  "propose"
+                ]
+              },
+              "role": {
+                "type": "string",
+                "minLength": 1
+              },
+              "oracleRef": {
+                "type": "string",
+                "minLength": 1
+              },
+              "capabilities": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": []
+              },
+              "budget": {
+                "type": "object",
+                "properties": {
+                  "usdMicros": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "turns": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "usdMicros"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "kind"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "classification": {
+                "type": "string",
+                "enum": [
+                  "independent",
+                  "dependent"
+                ]
+              },
+              "justification": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "classification",
+              "justification"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "topology": {
+          "type": "string",
+          "enum": [
+            "single",
+            "sequential",
+            "fan-out"
+          ]
+        },
+        "integrationOrder": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "topology"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "additionalProperties": false
+}

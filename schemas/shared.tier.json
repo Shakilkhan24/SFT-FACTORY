@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.tier.json",
+  "title": "shared.tier",
+  "description": "Contract from pack 03 §3 shared, §7.",
+  "type": "string",
+  "enum": [
+    "R0",
+    "R1",
+    "R2",
+    "R3",
+    "R4"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review.panel-policy.json",
+  "title": "review.panel-policy",
+  "description": "Contract from pack 03 §3 review.",
+  "type": "object",
+  "properties": {
+    "requireUnanimousApproval": {
+      "type": "boolean",
+      "default": false
+    },
+    "securityReviewerRequiredAtTier": {
+      "type": "string",
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

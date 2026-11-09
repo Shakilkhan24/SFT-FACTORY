@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "definition.workflow-environment.json",
+  "title": "definition.workflow-environment",
+  "description": "Contract from pack 03 §4.5.",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "const": "factory/v1"
+    },
+    "kind": {
+      "const": "WorkflowEnvironment"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "isolation": {
+          "type": "string",
+          "enum": [
+            "T1",
+            "T2"
+          ]
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1
+        },
+        "network": {
+          "type": "object",
+          "properties": {
+            "egress": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "cpus": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "memoryMb": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pids": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "wallClockSeconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "isolation",
+        "image"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scm.webhook-event.json",
+  "title": "scm.webhook-event",
+  "description": "Contract from pack 03 §3 SCM.",
+  "type": "object",
+  "properties": {
+    "deliveryId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload": {}
+  },
+  "required": [
+    "deliveryId",
+    "event",
+    "payload"
+  ],
+  "additionalProperties": false
+}

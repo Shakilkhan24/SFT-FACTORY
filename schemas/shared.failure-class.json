@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.failure-class.json",
+  "title": "shared.failure-class",
+  "description": "Contract from pack 03 §3 shared, §7.",
+  "type": "string",
+  "enum": [
+    "model.reasoning",
+    "model.capability",
+    "workflow.composition",
+    "context.insufficient",
+    "verification.failure",
+    "environment.failure",
+    "policy.denied",
+    "budget.exhausted",
+    "tool.unavailable",
+    "unknown"
+  ]
+}

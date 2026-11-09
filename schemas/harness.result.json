@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "harness.result.json",
+  "title": "harness.result",
+  "description": "Contract from pack 03 §3 harness.",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failure",
+        "incomplete"
+      ]
+    },
+    "content": {
+      "type": "string",
+      "default": ""
+    },
+    "toolCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "input": {}
+        },
+        "required": [
+          "id",
+          "name",
+          "input"
+        ],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "tokensIn": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokensOut": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cacheRead": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cacheWrite": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "costUsdMicros": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "tokensIn",
+        "tokensOut",
+        "costUsdMicros"
+      ],
+      "additionalProperties": false
+    },
+    "failure": {
+      "type": "object",
+      "properties": {
+        "class": {
+          "type": "string",
+          "enum": [
+            "model.reasoning",
+            "model.capability",
+            "workflow.composition",
+            "context.insufficient",
+            "verification.failure",
+            "environment.failure",
+            "policy.denied",
+            "budget.exhausted",
+            "tool.unavailable",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retriable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "class",
+        "reason",
+        "retriable"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "additionalProperties": false
+}

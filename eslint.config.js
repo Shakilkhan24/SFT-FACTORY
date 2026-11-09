@@ -36,7 +36,12 @@ export default tseslint.config(
   {
     // The CLI entry points are tools: printing to the console IS their job,
     // and `process.exit` is how they report a verdict.
-    files: ['tools/scope-guard.ts', 'tools/oracle-guard.ts', 'tools/context-bundle'],
+    files: [
+      'tools/scope-guard.ts',
+      'tools/oracle-guard.ts',
+      'tools/context-bundle',
+      'tools/export-schemas.ts',
+    ],
     languageOptions: {
       globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly' },
     },

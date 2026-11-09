@@ -1,0 +1,6 @@
+ticket, path_tier, size, agent, model, start, end, wall_minutes, turns, usd, oracle_author (owner|generator|agent), oracle_change_requests, review_minutes, review_rounds, rework_loops, escalations, defects_found_later
+T-1.01, R3, L, puku-cli, puku-ai-2.7, 2026-11-09T19:45:00+06:00, 2026-11-09T20:12:00+06:00, 27, unmeasured, unmeasured, owner, 0, 0, 0, 1, 0, 0
+T-1.02, R4, M, puku-cli, puku-ai-2.7, unmeasured, unmeasured, unmeasured, unmeasured, unmeasured, owner, 0, 0, 0, 0, 0, 0
+T-1.03, R4, M, puku-cli, puku-ai-2.7, unmeasured, unmeasured, unmeasured, unmeasured, unmeasured, owner, 0, 0, 0, 0, 0, 0
+T-1.04, R3, M, puku-cli, puku-ai-2.7, unmeasured, unmeasured, unmeasured, unmeasured, unmeasured, owner, 0, 0, 0, 0, 0, 0
+T-1.05, R4, M, puku-cli, puku-ai-2.7, unmeasured, unmeasured, unmeasured, unmeasured, unmeasured, owner, 0, 0, 0, 0, 0, 0

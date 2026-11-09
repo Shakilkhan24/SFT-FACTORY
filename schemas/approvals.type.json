@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "approvals.type.json",
+  "title": "approvals.type",
+  "description": "Contract from pack 03 §2 approvals.",
+  "type": "string",
+  "enum": [
+    "plan",
+    "merge",
+    "definition",
+    "temporary-grant"
+  ]
+}

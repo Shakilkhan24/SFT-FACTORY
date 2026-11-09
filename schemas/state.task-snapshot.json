@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "state.task-snapshot.json",
+  "title": "state.task-snapshot",
+  "description": "Contract from pack 03 §3 state.",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "TRIAGED",
+        "REFINED",
+        "PLANNED",
+        "QUEUED",
+        "RUNNING",
+        "VERIFYING",
+        "AWAITING_REVIEW",
+        "AWAITING_APPROVAL",
+        "APPROVED",
+        "MERGING",
+        "MERGED",
+        "DEPLOYING",
+        "DEPLOYED",
+        "REJECTED",
+        "FAILED",
+        "ABANDONED",
+        "INCOMPLETE",
+        "ESCALATED"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "taskId",
+    "state",
+    "version"
+  ],
+  "additionalProperties": false
+}

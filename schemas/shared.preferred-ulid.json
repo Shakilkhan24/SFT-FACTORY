@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.preferred-ulid.json",
+  "title": "shared.preferred-ulid",
+  "description": "Contract from pack 03 §1 IDs.",
+  "type": "string",
+  "pattern": "^(tsk|run|apr|chg|orc|gat|crd|cps|env)_[0-9A-HJKMNP-TV-Z]{26}$"
+}

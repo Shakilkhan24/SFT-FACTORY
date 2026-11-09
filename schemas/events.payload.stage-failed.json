@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "events.payload.stage-failed.json",
+  "title": "events.payload.stage-failed",
+  "description": "Contract from pack 03 §5.",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "failureClass": {
+      "type": "string",
+      "enum": [
+        "model.reasoning",
+        "model.capability",
+        "workflow.composition",
+        "context.insufficient",
+        "verification.failure",
+        "environment.failure",
+        "policy.denied",
+        "budget.exhausted",
+        "tool.unavailable",
+        "unknown"
+      ]
+    },
+    "retriable": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "runId",
+    "failureClass",
+    "retriable"
+  ],
+  "additionalProperties": false
+}

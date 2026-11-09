@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gateway.response.json",
+  "title": "gateway.response",
+  "description": "Contract from pack 03 §3 model gateway.",
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "string"
+    },
+    "json": {},
+    "toolCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "input": {}
+        },
+        "required": [
+          "id",
+          "name",
+          "input"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "tokensIn": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokensOut": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cacheRead": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cacheWrite": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "costUsdMicros": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "tokensIn",
+        "tokensOut",
+        "costUsdMicros"
+      ],
+      "additionalProperties": false
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "routingDecision": {
+      "type": "object",
+      "properties": {
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fallbackUsed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rule",
+        "fallbackUsed"
+      ],
+      "additionalProperties": false
+    },
+    "cached": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "content",
+    "usage",
+    "model",
+    "provider",
+    "routingDecision",
+    "cached"
+  ],
+  "additionalProperties": false
+}

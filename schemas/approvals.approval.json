@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "approvals.approval.json",
+  "title": "approvals.approval",
+  "description": "Contract from pack 03 §3 approval.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "merge",
+        "definition",
+        "temporary-grant"
+      ]
+    },
+    "artefactKind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artefactRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artefactSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "approvers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "requested",
+        "granted",
+        "refused",
+        "expired",
+        "revoked",
+        "consumed",
+        "void"
+      ]
+    },
+    "requestedAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expiresAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decidedBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "securityScopeAck": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "id",
+    "taskId",
+    "type",
+    "artefactKind",
+    "artefactRef",
+    "artefactSha256",
+    "approvers",
+    "status",
+    "requestedAt",
+    "expiresAt"
+  ],
+  "additionalProperties": false
+}

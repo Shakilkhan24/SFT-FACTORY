@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "definition.policy-bundle.json",
+  "title": "definition.policy-bundle",
+  "description": "Contract from pack 03 §4.7.",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "const": "factory/v1"
+    },
+    "kind": {
+      "const": "PolicyBundle"
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "denyRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "when": {
+                "type": "object",
+                "properties": {
+                  "capability": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "action": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "actorKind": {
+                    "type": "string",
+                    "enum": [
+                      "human",
+                      "agent",
+                      "system",
+                      "integration"
+                    ]
+                  },
+                  "autonomyBelow": {
+                    "anyOf": [
+                      {
+                        "const": 0
+                      },
+                      {
+                        "const": 1
+                      },
+                      {
+                        "const": 2
+                      },
+                      {
+                        "const": 3
+                      },
+                      {
+                        "const": 4
+                      }
+                    ]
+                  },
+                  "pathsMatch": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hostClass": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "scope": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "effectClass": {
+                    "type": "string",
+                    "enum": [
+                      "E0",
+                      "E1",
+                      "E2",
+                      "E3",
+                      "E4"
+                    ]
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "R0",
+                      "R1",
+                      "R2",
+                      "R3",
+                      "R4"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "when"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "protectedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": []
+        },
+        "effectRules": {
+          "type": "object",
+          "properties": {
+            "E0": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "allowIfResourceScoped",
+                "requireApproval"
+              ],
+              "default": "allow"
+            },
+            "E1": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "allowIfResourceScoped",
+                "requireApproval"
+              ],
+              "default": "allow"
+            },
+            "E2": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "allowIfResourceScoped",
+                "requireApproval"
+              ],
+              "default": "allowIfResourceScoped"
+            },
+            "E3": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "allowIfResourceScoped",
+                "requireApproval"
+              ],
+              "default": "requireApproval"
+            },
+            "E4": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "allowIfResourceScoped",
+                "requireApproval"
+              ],
+              "default": "requireApproval"
+            }
+          },
+          "additionalProperties": false,
+          "default": {
+            "E0": "allow",
+            "E1": "allow",
+            "E2": "allowIfResourceScoped",
+            "E3": "requireApproval",
+            "E4": "requireApproval"
+          }
+        },
+        "tierRules": {
+          "type": "object",
+          "properties": {
+            "R0": {
+              "type": "object",
+              "properties": {
+                "approveActions": {
+                  "type": "string",
+                  "enum": [
+                    "requireApproval-security"
+                  ]
+                },
+                "agentChange": {
+                  "type": "string",
+                  "enum": [
+                    "deny",
+                    "requireApproval-security"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "R1": {
+              "type": "object",
+              "properties": {
+                "approveActions": {
+                  "type": "string",
+                  "enum": [
+                    "requireApproval-security"
+                  ]
+                },
+                "agentChange": {
+                  "type": "string",
+                  "enum": [
+                    "deny",
+                    "requireApproval-security"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "R2": {
+              "type": "object",
+              "properties": {
+                "approveActions": {
+                  "type": "string",
+                  "enum": [
+                    "requireApproval-security"
+                  ]
+                },
+                "agentChange": {
+                  "type": "string",
+                  "enum": [
+                    "deny",
+                    "requireApproval-security"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "R3": {
+              "type": "object",
+              "properties": {
+                "approveActions": {
+                  "type": "string",
+                  "enum": [
+                    "requireApproval-security"
+                  ]
+                },
+                "agentChange": {
+                  "type": "string",
+                  "enum": [
+                    "deny",
+                    "requireApproval-security"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "R4": {
+              "type": "object",
+              "properties": {
+                "approveActions": {
+                  "type": "string",
+                  "enum": [
+                    "requireApproval-security"
+                  ]
+                },
+                "agentChange": {
+                  "type": "string",
+                  "enum": [
+                    "deny",
+                    "requireApproval-security"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "default": {
+          "const": "deny"
+        }
+      },
+      "required": [
+        "default"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "spec"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.effect-class.json",
+  "title": "shared.effect-class",
+  "description": "Contract from pack 03 §3 shared, §7.",
+  "type": "string",
+  "enum": [
+    "E0",
+    "E1",
+    "E2",
+    "E3",
+    "E4"
+  ]
+}

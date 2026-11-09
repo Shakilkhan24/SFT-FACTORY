@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "events.payload.stage-completed.json",
+  "title": "events.payload.stage-completed",
+  "description": "Contract from pack 03 §5, 09 §4.4.",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nodeId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failure",
+        "incomplete"
+      ]
+    },
+    "artefactRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    }
+  },
+  "required": [
+    "runId",
+    "nodeId",
+    "outcome"
+  ],
+  "additionalProperties": false
+}

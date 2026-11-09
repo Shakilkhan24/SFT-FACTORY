@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.scope.json",
+  "title": "shared.scope",
+  "description": "Contract from pack 03 §7 scope vocabulary.",
+  "type": "string",
+  "minLength": 1
+}

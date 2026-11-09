@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gateway.message.json",
+  "title": "gateway.message",
+  "description": "Contract from pack 03 §3 model gateway.",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "system",
+        "user",
+        "assistant",
+        "tool"
+      ]
+    },
+    "content": {
+      "type": "string"
+    },
+    "toolCallId": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "role",
+    "content"
+  ],
+  "additionalProperties": false
+}

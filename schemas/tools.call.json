@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tools.call.json",
+  "title": "tools.call",
+  "description": "Contract from pack 03 §3 tools.",
+  "type": "object",
+  "properties": {
+    "capabilityId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "args": {},
+    "idempotencyExtra": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "capabilityId",
+    "args"
+  ],
+  "additionalProperties": false
+}

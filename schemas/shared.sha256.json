@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "shared.sha256.json",
+  "title": "shared.sha256",
+  "description": "Contract from pack 03 §3 shared.",
+  "type": "string",
+  "pattern": "^sha256:[0-9a-f]{64}$"
+}

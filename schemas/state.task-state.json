@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "state.task-state.json",
+  "title": "state.task-state",
+  "description": "Contract from pack 03 §6.",
+  "type": "string",
+  "enum": [
+    "DRAFT",
+    "TRIAGED",
+    "REFINED",
+    "PLANNED",
+    "QUEUED",
+    "RUNNING",
+    "VERIFYING",
+    "AWAITING_REVIEW",
+    "AWAITING_APPROVAL",
+    "APPROVED",
+    "MERGING",
+    "MERGED",
+    "DEPLOYING",
+    "DEPLOYED",
+    "REJECTED",
+    "FAILED",
+    "ABANDONED",
+    "INCOMPLETE",
+    "ESCALATED"
+  ]
+}

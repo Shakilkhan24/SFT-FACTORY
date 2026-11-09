@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scheduler.job.json",
+  "title": "scheduler.job",
+  "description": "Contract from pack 03 §3 scheduling.",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nodeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "priority": {
+      "type": "integer"
+    },
+    "availableAt": {
+      "type": "string"
+    },
+    "maxAttempts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload": {}
+  },
+  "required": [
+    "taskId",
+    "kind",
+    "idempotencyKey"
+  ],
+  "additionalProperties": false
+}

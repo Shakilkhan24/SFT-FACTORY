@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tools.result.json",
+  "title": "tools.result",
+  "description": "Contract from pack 03 §3 tools.",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "value": {},
+    "error": {
+      "type": "object",
+      "properties": {
+        "class": {
+          "type": "string",
+          "enum": [
+            "model.reasoning",
+            "model.capability",
+            "workflow.composition",
+            "context.insufficient",
+            "verification.failure",
+            "environment.failure",
+            "policy.denied",
+            "budget.exhausted",
+            "tool.unavailable",
+            "unknown"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "class",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "trust": {
+      "type": "string",
+      "enum": [
+        "trusted",
+        "untrusted"
+      ]
+    },
+    "invocationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replayed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok",
+    "trust",
+    "invocationId",
+    "replayed"
+  ],
+  "additionalProperties": false
+}
