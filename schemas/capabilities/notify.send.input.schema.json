@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "channel": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "channel",
+    "message"
+  ],
+  "additionalProperties": false,
+  "title": "notify.send input",
+  "description": "The arguments notify.send accepts."
+}

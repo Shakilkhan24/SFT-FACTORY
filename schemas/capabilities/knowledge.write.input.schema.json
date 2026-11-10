@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "runId",
+    "kind",
+    "content"
+  ],
+  "additionalProperties": false,
+  "title": "knowledge.write input",
+  "description": "The arguments knowledge.write accepts."
+}

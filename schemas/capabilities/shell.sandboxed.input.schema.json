@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "command": {
+      "type": "string"
+    },
+    "args": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "command",
+    "args"
+  ],
+  "additionalProperties": false,
+  "title": "shell.sandboxed input",
+  "description": "The arguments shell.sandboxed accepts."
+}

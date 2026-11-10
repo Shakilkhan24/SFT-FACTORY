@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "github.pr.create output",
+  "description": "The result github.pr.create returns."
+}

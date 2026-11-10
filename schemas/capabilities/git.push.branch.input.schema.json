@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "branch": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repo",
+    "branch"
+  ],
+  "additionalProperties": false,
+  "title": "git.push.branch input",
+  "description": "The arguments git.push.branch accepts."
+}

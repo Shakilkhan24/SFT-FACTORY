@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "mcp.fixture.echo output",
+  "description": "The result mcp.fixture.echo returns."
+}

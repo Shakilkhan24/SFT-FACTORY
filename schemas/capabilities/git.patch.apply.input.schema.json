@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "patch": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repo",
+    "patch"
+  ],
+  "additionalProperties": false,
+  "title": "git.patch.apply input",
+  "description": "The arguments git.patch.apply accepts."
+}

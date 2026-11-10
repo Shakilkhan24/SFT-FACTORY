@@ -56,6 +56,12 @@ jobs:
       - name: Dependency rules
         run: pnpm lint:deps
 
+      - name: Contract schemas are in sync
+        run: pnpm schemas:check
+
+      - name: Capability registry is in sync
+        run: pnpm capabilities:check
+
       - name: Unit tests
         run: pnpm test
 

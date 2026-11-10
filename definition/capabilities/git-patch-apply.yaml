@@ -1,0 +1,47 @@
+# git.patch.apply — pack 04 §5's v1 capability registry.
+#
+# patch path (path-scope enforced).
+#
+# The scope is what a grant must cover; the resource pattern is what the
+# resource-scope check matches the concrete target against. Both are
+# load-bearing: a grant that permits the capability but is scoped to another
+# repository is refused on the resource, not on the capability.
+
+apiVersion: factory/v1
+kind: ToolCapability
+metadata:
+  name: git.patch.apply
+  version: "1.0.0"
+spec:
+  owner: factory-platform
+  kind: mutation
+  transport: inproc
+  effect:
+    class: E1
+    reversible: true
+    external: false
+  scope:
+    required:
+      - "repo:write:path:**"
+    resourcePattern: "repo:{owner}/{name}"
+    environment: "orchestrator"
+  credentials:
+    provider: "none"
+    permissions: {}
+    ttlSeconds: 60
+  inputSchema:
+    $ref: "schemas/capabilities/git.patch.apply.input.schema.json"
+  outputSchema:
+    $ref: "schemas/capabilities/git.patch.apply.output.schema.json"
+  trust:
+    inputTrust: trusted
+    resultTrust: trusted
+  health:
+    check: "the worktree is writable"
+    timeoutMs: 30000
+    degraded: "git.patch.apply is degraded; the call may fail"
+  observability:
+    redactArguments: []
+  cost:
+    unit: "call"
+    usdMicros: 0

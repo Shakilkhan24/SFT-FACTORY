@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repo"
+  ],
+  "additionalProperties": false,
+  "title": "repo.snapshot.read input",
+  "description": "The arguments repo.snapshot.read accepts."
+}

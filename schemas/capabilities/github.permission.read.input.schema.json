@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repo"
+  ],
+  "additionalProperties": false,
+  "title": "github.permission.read input",
+  "description": "The arguments github.permission.read accepts."
+}

@@ -1,0 +1,47 @@
+# repo.snapshot.read — pack 04 §5's v1 capability registry.
+#
+# assembler, completion stages.
+#
+# The scope is what a grant must cover; the resource pattern is what the
+# resource-scope check matches the concrete target against. Both are
+# load-bearing: a grant that permits the capability but is scoped to another
+# repository is refused on the resource, not on the capability.
+
+apiVersion: factory/v1
+kind: ToolCapability
+metadata:
+  name: repo.snapshot.read
+  version: "1.0.0"
+spec:
+  owner: factory-platform
+  kind: read
+  transport: inproc
+  effect:
+    class: E0
+    reversible: true
+    external: false
+  scope:
+    required:
+      - "repo:read"
+    resourcePattern: "repo:{owner}/{name}"
+    environment: "orchestrator"
+  credentials:
+    provider: "none"
+    permissions: {}
+    ttlSeconds: 60
+  inputSchema:
+    $ref: "schemas/capabilities/repo.snapshot.read.input.schema.json"
+  outputSchema:
+    $ref: "schemas/capabilities/repo.snapshot.read.output.schema.json"
+  trust:
+    inputTrust: trusted
+    resultTrust: trusted
+  health:
+    check: "the repository is reachable"
+    timeoutMs: 30000
+    degraded: "repo.snapshot.read is degraded; the call may fail"
+  observability:
+    redactArguments: []
+  cost:
+    unit: "call"
+    usdMicros: 0

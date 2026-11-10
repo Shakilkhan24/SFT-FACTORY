@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "headSha": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "conclusion": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repo",
+    "headSha",
+    "name",
+    "conclusion",
+    "summary"
+  ],
+  "additionalProperties": false,
+  "title": "github.checks.publish input",
+  "description": "The arguments github.checks.publish accepts."
+}

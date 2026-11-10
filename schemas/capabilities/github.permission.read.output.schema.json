@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "github.permission.read output",
+  "description": "The result github.permission.read returns."
+}

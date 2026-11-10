@@ -1,0 +1,48 @@
+# git.push.branch — pack 04 §5's v1 capability registry.
+#
+# patch path.
+#
+# The scope is what a grant must cover; the resource pattern is what the
+# resource-scope check matches the concrete target against. Both are
+# load-bearing: a grant that permits the capability but is scoped to another
+# repository is refused on the resource, not on the capability.
+
+apiVersion: factory/v1
+kind: ToolCapability
+metadata:
+  name: git.push.branch
+  version: "1.0.0"
+spec:
+  owner: factory-platform
+  kind: mutation
+  transport: cli
+  effect:
+    class: E2
+    reversible: false
+    external: true
+  scope:
+    required:
+      - "git.write.branch"
+    resourcePattern: "repo:{owner}/{name}"
+    environment: "orchestrator"
+  credentials:
+    provider: "github"
+    permissions:
+      contents: write
+    ttlSeconds: 3600
+  inputSchema:
+    $ref: "schemas/capabilities/git.push.branch.input.schema.json"
+  outputSchema:
+    $ref: "schemas/capabilities/git.push.branch.output.schema.json"
+  trust:
+    inputTrust: trusted
+    resultTrust: trusted
+  health:
+    check: "git is available and the credential is live"
+    timeoutMs: 30000
+    degraded: "git.push.branch is degraded; the call may fail"
+  observability:
+    redactArguments: []
+  cost:
+    unit: "call"
+    usdMicros: 0

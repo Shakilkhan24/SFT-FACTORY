@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "query": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repo",
+    "query"
+  ],
+  "additionalProperties": false,
+  "title": "repo.search input",
+  "description": "The arguments repo.search accepts."
+}

@@ -1,0 +1,48 @@
+# github.issue.comment — pack 04 §5's v1 capability registry.
+#
+# status/escalation notes.
+#
+# The scope is what a grant must cover; the resource pattern is what the
+# resource-scope check matches the concrete target against. Both are
+# load-bearing: a grant that permits the capability but is scoped to another
+# repository is refused on the resource, not on the capability.
+
+apiVersion: factory/v1
+kind: ToolCapability
+metadata:
+  name: github.issue.comment
+  version: "1.0.0"
+spec:
+  owner: factory-platform
+  kind: communicate
+  transport: http
+  effect:
+    class: E2
+    reversible: false
+    external: true
+  scope:
+    required:
+      - "git.write.pr"
+    resourcePattern: "repo:{owner}/{name}"
+    environment: "orchestrator"
+  credentials:
+    provider: "github"
+    permissions:
+      issues: write
+    ttlSeconds: 3600
+  inputSchema:
+    $ref: "schemas/capabilities/github.issue.comment.input.schema.json"
+  outputSchema:
+    $ref: "schemas/capabilities/github.issue.comment.output.schema.json"
+  trust:
+    inputTrust: trusted
+    resultTrust: trusted
+  health:
+    check: "the GitHub API is reachable"
+    timeoutMs: 30000
+    degraded: "github.issue.comment is degraded; the call may fail"
+  observability:
+    redactArguments: []
+  cost:
+    unit: "call"
+    usdMicros: 0

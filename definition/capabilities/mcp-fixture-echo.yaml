@@ -1,0 +1,47 @@
+# mcp.fixture.echo — pack 04 §5's v1 capability registry.
+#
+# contract test (FR-62).
+#
+# The scope is what a grant must cover; the resource pattern is what the
+# resource-scope check matches the concrete target against. Both are
+# load-bearing: a grant that permits the capability but is scoped to another
+# repository is refused on the resource, not on the capability.
+
+apiVersion: factory/v1
+kind: ToolCapability
+metadata:
+  name: mcp.fixture.echo
+  version: "1.0.0"
+spec:
+  owner: factory-platform
+  kind: read
+  transport: mcp
+  effect:
+    class: E0
+    reversible: true
+    external: true
+  scope:
+    required:
+      - "mcp.test"
+    resourcePattern: "transport:{transport}"
+    environment: "test"
+  credentials:
+    provider: "none"
+    permissions: {}
+    ttlSeconds: 60
+  inputSchema:
+    $ref: "schemas/capabilities/mcp.fixture.echo.input.schema.json"
+  outputSchema:
+    $ref: "schemas/capabilities/mcp.fixture.echo.output.schema.json"
+  trust:
+    inputTrust: trusted
+    resultTrust: untrusted
+  health:
+    check: "the fixture MCP server is reachable"
+    timeoutMs: 30000
+    degraded: "mcp.fixture.echo is degraded; the call may fail"
+  observability:
+    redactArguments: []
+  cost:
+    unit: "call"
+    usdMicros: 0

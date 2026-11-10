@@ -1,0 +1,48 @@
+# github.ci.read — pack 04 §5's v1 capability registry.
+#
+# D-2, merge-gate.
+#
+# The scope is what a grant must cover; the resource pattern is what the
+# resource-scope check matches the concrete target against. Both are
+# load-bearing: a grant that permits the capability but is scoped to another
+# repository is refused on the resource, not on the capability.
+
+apiVersion: factory/v1
+kind: ToolCapability
+metadata:
+  name: github.ci.read
+  version: "1.0.0"
+spec:
+  owner: factory-platform
+  kind: read
+  transport: http
+  effect:
+    class: E0
+    reversible: true
+    external: true
+  scope:
+    required:
+      - "repo:read"
+    resourcePattern: "repo:{owner}/{name}"
+    environment: "orchestrator"
+  credentials:
+    provider: "github"
+    permissions:
+      actions: read
+    ttlSeconds: 3600
+  inputSchema:
+    $ref: "schemas/capabilities/github.ci.read.input.schema.json"
+  outputSchema:
+    $ref: "schemas/capabilities/github.ci.read.output.schema.json"
+  trust:
+    inputTrust: trusted
+    resultTrust: untrusted
+  health:
+    check: "the GitHub API is reachable"
+    timeoutMs: 30000
+    degraded: "github.ci.read is degraded; the call may fail"
+  observability:
+    redactArguments: []
+  cost:
+    unit: "call"
+    usdMicros: 0

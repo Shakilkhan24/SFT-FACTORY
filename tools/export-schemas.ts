@@ -71,7 +71,17 @@ const main = (): void => {
       process.exit(1);
     }
 
-    const onDisk = new Set(readdirSync(outDir).filter((name) => name !== 'README.md'));
+    // Only **files** are schema documents. A subdirectory — such as
+    // `schemas/capabilities/`, which holds the capabilities' own argument
+    // schemas — is a different set of documents that this exporter does
+    // not produce, so it is not an orphan. It is checked by its own
+    // generator (`tools/generate-capabilities.ts --check`).
+    const onDisk = new Set(
+      readdirSync(outDir, { withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => entry.name)
+        .filter((name) => name !== 'README.md'),
+    );
     for (const [name, content] of documents) {
       if (!onDisk.has(name)) {
         problems.push(`missing: schemas/${name}`);

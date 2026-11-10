@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "number": {
+      "type": "integer"
+    },
+    "body": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repo",
+    "number",
+    "body"
+  ],
+  "additionalProperties": false,
+  "title": "github.issue.comment input",
+  "description": "The arguments github.issue.comment accepts."
+}

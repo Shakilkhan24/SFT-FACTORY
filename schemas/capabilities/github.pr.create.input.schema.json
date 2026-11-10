@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "body": {
+      "type": "string"
+    },
+    "head": {
+      "type": "string"
+    },
+    "base": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repo",
+    "title",
+    "body",
+    "head",
+    "base"
+  ],
+  "additionalProperties": false,
+  "title": "github.pr.create input",
+  "description": "The arguments github.pr.create accepts."
+}

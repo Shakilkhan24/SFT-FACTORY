@@ -1,0 +1,47 @@
+# git.worktree.create — pack 04 §5's v1 capability registry.
+#
+# patch path.
+#
+# The scope is what a grant must cover; the resource pattern is what the
+# resource-scope check matches the concrete target against. Both are
+# load-bearing: a grant that permits the capability but is scoped to another
+# repository is refused on the resource, not on the capability.
+
+apiVersion: factory/v1
+kind: ToolCapability
+metadata:
+  name: git.worktree.create
+  version: "1.0.0"
+spec:
+  owner: factory-platform
+  kind: compute
+  transport: inproc
+  effect:
+    class: E1
+    reversible: true
+    external: false
+  scope:
+    required:
+      - "git.write.branch"
+    resourcePattern: "repo:{owner}/{name}"
+    environment: "orchestrator"
+  credentials:
+    provider: "none"
+    permissions: {}
+    ttlSeconds: 60
+  inputSchema:
+    $ref: "schemas/capabilities/git.worktree.create.input.schema.json"
+  outputSchema:
+    $ref: "schemas/capabilities/git.worktree.create.output.schema.json"
+  trust:
+    inputTrust: trusted
+    resultTrust: trusted
+  health:
+    check: "git is available"
+    timeoutMs: 30000
+    degraded: "git.worktree.create is degraded; the call may fail"
+  observability:
+    redactArguments: []
+  cost:
+    unit: "call"
+    usdMicros: 0

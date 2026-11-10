@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "repo",
+    "message",
+    "paths"
+  ],
+  "additionalProperties": false,
+  "title": "git.commit input",
+  "description": "The arguments git.commit accepts."
+}

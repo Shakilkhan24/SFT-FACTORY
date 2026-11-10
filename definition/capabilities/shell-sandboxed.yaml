@@ -1,0 +1,47 @@
+# shell.sandboxed — pack 04 §5's v1 capability registry.
+#
+# verify, harness (recorded).
+#
+# The scope is what a grant must cover; the resource pattern is what the
+# resource-scope check matches the concrete target against. Both are
+# load-bearing: a grant that permits the capability but is scoped to another
+# repository is refused on the resource, not on the capability.
+
+apiVersion: factory/v1
+kind: ToolCapability
+metadata:
+  name: shell.sandboxed
+  version: "1.0.0"
+spec:
+  owner: factory-platform
+  kind: compute
+  transport: inproc
+  effect:
+    class: E1
+    reversible: false
+    external: false
+  scope:
+    required:
+      - "shell.sandboxed"
+    resourcePattern: "env:{envId}"
+    environment: "T2"
+  credentials:
+    provider: "none"
+    permissions: {}
+    ttlSeconds: 60
+  inputSchema:
+    $ref: "schemas/capabilities/shell.sandboxed.input.schema.json"
+  outputSchema:
+    $ref: "schemas/capabilities/shell.sandboxed.output.schema.json"
+  trust:
+    inputTrust: untrusted
+    resultTrust: trusted
+  health:
+    check: "the isolation service is reachable"
+    timeoutMs: 30000
+    degraded: "shell.sandboxed is degraded; the call may fail"
+  observability:
+    redactArguments: []
+  cost:
+    unit: "call"
+    usdMicros: 0

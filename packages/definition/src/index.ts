@@ -101,3 +101,10 @@ export {
   parsePolicyBundle,
   readPolicyBundle,
 } from './policy-bundle.js';
+
+export {
+  buildCapabilityRegistry,
+  type CapabilityProblem,
+  type CapabilityRegistryEntry,
+  type CapabilityRegistryLoad,
+} from './capability-registry.js';

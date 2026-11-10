@@ -9,12 +9,14 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "ci": "pnpm lint && pnpm typecheck && pnpm lint:deps && pnpm schemas:check && pnpm ddl:check && pnpm test && pnpm test:acceptance && pnpm test:invariants && pnpm test:redteam",
+    "ci": "pnpm lint && pnpm typecheck && pnpm lint:deps && pnpm schemas:check && pnpm capabilities:check && pnpm ddl:check && pnpm test && pnpm test:acceptance && pnpm test:invariants && pnpm test:redteam",
     "lint": "eslint .",
     "lint:deps": "depcruise --config .dependency-cruiser.json .",
     "typecheck": "tsc --build --verbose",
     "schemas": "pnpm typecheck && node tools/export-schemas.ts",
     "schemas:check": "pnpm typecheck && node tools/export-schemas.ts --check",
+    "capabilities": "node tools/generate-capabilities.ts",
+    "capabilities:check": "node tools/generate-capabilities.ts --check",
     "ddl:sync": "node tools/extract-pack-ddl.ts",
     "ddl:check": "node tools/extract-pack-ddl.ts --check",
     "ddl:oracle": "bash tools/run-pack-ddl-oracle.sh",
@@ -26,6 +28,7 @@
     "test:concurrency": "vitest run tests/concurrency --passWithNoTests",
     "test:e2e": "vitest run tests/e2e --passWithNoTests",
     "test:mutation": "vitest run tests/invariants --mutation",
+    "test:mutation:broker": "node tools/mutate-broker.ts",
     "coverage-check": "node tools/coverage-check.mjs"
   },
   "devDependencies": {

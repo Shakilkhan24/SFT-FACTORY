@@ -70,4 +70,43 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
+  {
+    // **A0.2 — the lint half.** Adapters are constructible only inside the
+    // broker module.
+    //
+    // blueprint 11 §1: "without a registry and a broker, an agent reaches a
+    // tool directly and nothing checks whether it may." The runtime guard
+    // in `packages/broker/src/adapters/factory.ts` makes a direct call
+    // *fail*; this rule makes the direct *import* visible in review.
+    //
+    // The rule is deliberately narrow about **who** may import an adapter:
+    // `adapters/factory.ts` constructs them and `broker.ts` reaches them
+    // through the factory. Every other path — a test helper, an app, a
+    // stray module — is refused.
+    //
+    // The pattern bans the adapter modules; the exceptions re-admit them
+    // for exactly two files.
+    files: ['**/*.ts'],
+    ignores: [
+      'packages/broker/src/adapters/factory.ts',
+      'packages/broker/src/broker.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/packages/broker/src/adapters/**',
+                'packages/broker/src/adapters/**',
+              ],
+              message:
+                'Adapters may only be constructed inside the broker module. Import @factory/broker, or the adapter factory at packages/broker/src/adapters/factory.ts.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "headSha": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "repo",
+    "headSha"
+  ],
+  "additionalProperties": false,
+  "title": "github.ci.read input",
+  "description": "The arguments github.ci.read accepts."
+}
