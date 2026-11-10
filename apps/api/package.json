@@ -10,5 +10,16 @@
   },
   "scripts": {
     "typecheck": "tsc --build"
+  },
+  "dependencies": {
+    "@factory/contracts": "workspace:^",
+    "@factory/core": "workspace:^",
+    "@factory/db": "workspace:^",
+    "@factory/definition": "workspace:^",
+    "@factory/eventlog": "workspace:^",
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/rate-limit": "^11.2.2",
+    "fastify": "5.12.8",
+    "zod": "3.23.8"
   }
 }

@@ -7,5 +7,21 @@
   "include": [
     "src/**/*.ts"
   ],
-  "references": []
+  "references": [
+    {
+      "path": "../../packages/contracts"
+    },
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/db"
+    },
+    {
+      "path": "../../packages/definition"
+    },
+    {
+      "path": "../../packages/eventlog"
+    }
+  ]
 }
