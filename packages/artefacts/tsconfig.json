@@ -13,6 +13,15 @@
     },
     {
       "path": "../core"
+    },
+    {
+      "path": "../credentials"
+    },
+    {
+      "path": "../db"
+    },
+    {
+      "path": "../eventlog"
     }
   ]
 }

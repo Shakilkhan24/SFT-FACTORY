@@ -28,6 +28,7 @@
     "test:concurrency": "vitest run tests/concurrency --passWithNoTests",
     "test:e2e": "vitest run tests/e2e --passWithNoTests",
     "test:mutation": "vitest run tests/invariants --mutation",
+    "test:mutation:artefacts": "node tools/mutate-artefacts.ts",
     "test:mutation:broker": "node tools/mutate-broker.ts",
     "test:mutation:credentials": "node tools/mutate-credentials.ts",
     "test:mutation:gateway": "node tools/mutate-gateway.ts",

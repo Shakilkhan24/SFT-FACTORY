@@ -113,7 +113,23 @@ importers:
 
   packages/approvals: {}
 
-  packages/artefacts: {}
+  packages/artefacts:
+    dependencies:
+      '@factory/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../core
+      '@factory/credentials':
+        specifier: workspace:*
+        version: link:../credentials
+      '@factory/db':
+        specifier: workspace:*
+        version: link:../db
+      '@factory/eventlog':
+        specifier: workspace:*
+        version: link:../eventlog
 
   packages/broker:
     dependencies:
