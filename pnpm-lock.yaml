@@ -112,7 +112,23 @@ importers:
 
   packages/artefacts: {}
 
-  packages/broker: {}
+  packages/broker:
+    dependencies:
+      '@factory/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../core
+      '@factory/db':
+        specifier: workspace:*
+        version: link:../db
+      '@factory/eventlog':
+        specifier: workspace:*
+        version: link:../eventlog
+      '@factory/policy':
+        specifier: workspace:*
+        version: link:../policy
 
   packages/calibration: {}
 
@@ -126,7 +142,17 @@ importers:
 
   packages/core: {}
 
-  packages/credentials: {}
+  packages/credentials:
+    dependencies:
+      '@factory/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../core
+      '@factory/db':
+        specifier: workspace:*
+        version: link:../db
 
   packages/db:
     dependencies:
