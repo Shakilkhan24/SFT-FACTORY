@@ -33,6 +33,7 @@
     "test:mutation:credentials": "node tools/mutate-credentials.ts",
     "test:mutation:gateway": "node tools/mutate-gateway.ts",
     "test:mutation:isolation": "node tools/mutate-isolation.ts",
+    "test:mutation:orchestrator": "node tools/mutate-orchestrator.ts",
     "coverage-check": "node tools/coverage-check.mjs"
   },
   "devDependencies": {
