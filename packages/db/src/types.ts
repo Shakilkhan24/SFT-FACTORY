@@ -347,6 +347,33 @@ export interface ProjectionCursorsTable {
 }
 
 /**
+ * `task_current` — the **projection** table (checklist 03 T-1.15).
+ *
+ * The columns are pack `03` §2's normative list for `task_current`,
+ * transcribed in `migrations/0002_projections.sql`. The row is a **view**:
+ * it is disposable, and it can be dropped and rebuilt from the log (A0.6).
+ *
+ * So the table carries no `created_at`/`updated_at` of its own — the
+ * projection's freshness is `last_activity_at`, which is the **log's**
+ * clock, not the wall clock of the write. A rebuild therefore produces
+ * byte-identical rows.
+ */
+export interface TaskCurrentTable {
+  task_id: string;
+  repo: string;
+  workflow: string;
+  state: string;
+  risk_tier: 'R0' | 'R1' | 'R2' | 'R3' | 'R4' | null;
+  needs_human: Generated<boolean>;
+  /** The **log's** clock — the last event's `occurred_at`, not `now()`. */
+  last_activity_at: Timestamp;
+  spent_usd_micros: Generated<number>;
+  budget_usd_micros: Generated<number>;
+  /** The free-form view — the stage, the blast radius, the risk score. */
+  summary: Generated<Json>;
+}
+
+/**
  * The `factory` schema, as Kysely sees it.
  */
 export interface FactoryDatabase {
@@ -371,6 +398,7 @@ export interface FactoryDatabase {
   edge_outbox: EdgeOutboxTable;
   kill_switch: KillSwitchTable;
   projection_cursors: ProjectionCursorsTable;
+  task_current: TaskCurrentTable;
 }
 
 export type SelectedEvents = Selectable<EventsTable>;

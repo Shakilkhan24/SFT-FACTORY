@@ -89,6 +89,7 @@ export type {
   SelectedEvents,
   SelectedPolicyDecisions,
   SelectedTasks,
+  TaskCurrentTable,
   TasksTable,
   ToolInvocationsTable,
   UpdatedEvents,

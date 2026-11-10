@@ -69,9 +69,28 @@ export interface ConnectionConfig {
   readonly mode?: ConnectionMode;
   /** Maximum pool size. Defaults to 10. */
   readonly max?: number;
+  /**
+   * How long a connection attempt may take, in milliseconds.
+   *
+   * `pg`'s pool **retries** a failed connection rather than giving up, so
+   * without this a client pointed at an unreachable host waits forever
+   * instead of failing. A CLI is the case that matters: an operator who
+   * mistyped a host needs an error, not a hang.
+   *
+   * Defaults to 10 seconds.
+   */
+  readonly connectTimeoutMs?: number;
 }
 
 const DEFAULT_MAX = 10;
+
+/**
+ * The default connection timeout.
+ *
+ * Ten seconds is long enough for a slow TLS handshake on a real cluster
+ * and short enough that an operator does not think the command has hung.
+ */
+const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
 
 /**
  * The session preamble for a pooled connection.
@@ -104,6 +123,9 @@ export const createDatabase = (config: ConnectionConfig): Kysely<FactoryDatabase
   const pool = new Pool({
     connectionString: config.connectionString,
     max: config.max ?? DEFAULT_MAX,
+    // `pg` retries a failed connection rather than giving up, so this is
+    // what turns an unreachable host into an error instead of a hang.
+    connectionTimeoutMillis: config.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS,
   });
 
   const statement = sessionPreamble(config.role, mode);

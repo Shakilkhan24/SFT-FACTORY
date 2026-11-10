@@ -20,6 +20,7 @@ import {
 } from './definition-wiring.js';
 import { runEventsCommand } from './events.js';
 import { resolveDefinitionDirectory } from './paths.js';
+import { runProjectionsCommand, PROJECTIONS_SUBCOMMANDS } from './projections.js';
 
 const USAGE = `usage: factory <command> [options]
 
@@ -35,6 +36,12 @@ commands:
   events show <aggregateId>
                          show one aggregate's chain and its chain verdict
   events health          report seq gaps and aggregate-version gaps
+
+  projections status     show the projector's cursor, row counts and staleness
+  projections catch-up   run the projector until it reaches the end of the log
+  projections check      compare a rebuild with what is there, changing nothing
+  projections rebuild --yes
+                         drop every projection and replay the log (A0.6)
 
   definition validate    check every definition document against its contract
   definition plan        show the structured diff against the applied version
@@ -157,8 +164,54 @@ export const run = async (
     );
   }
 
-  if (command === 'definition') {
+  if (command === 'projections') {
     const [subcommand, ...subArgs] = rest;
+    if (subcommand === undefined) {
+      return {
+        lines: ['usage: factory projections status | catch-up | check | rebuild --yes'],
+        exitCode: 2,
+      };
+    }
+    // The subcommand is checked **before** the connection string, because
+    // a typo in the subcommand is the operator's mistake and the error
+    // must name it — not send them off to configure a database for a
+    // command that does not exist.
+    if (!PROJECTIONS_SUBCOMMANDS.includes(subcommand)) {
+      return {
+        lines: [
+          `unknown subcommand \`factory projections ${subcommand}\``,
+          'usage: factory projections status | catch-up | check | rebuild --yes',
+        ],
+        exitCode: 2,
+      };
+    }
+    // The projector reads the log and writes only its own views, so the
+    // command runs through the **projector** role — the same role the
+    // running projector uses.
+    const connectionString =
+      environment['FACTORY_PROJECTOR_DATABASE_URL'] ??
+      environment['FACTORY_OWNER_DATABASE_URL'];
+    if (connectionString === undefined) {
+      return {
+        lines: [
+          'FACTORY_PROJECTOR_DATABASE_URL is not set.',
+          'The projections commands run as the factory_projector role.',
+        ],
+        exitCode: 2,
+      };
+    }
+    return runProjectionsCommand(
+      subcommand,
+      {
+        connectionString,
+        mode: ownerRoleMode(environment),
+        role: 'factory_projector',
+      },
+      subArgs,
+    );
+  }
+
+  if (command === 'definition') {    const [subcommand, ...subArgs] = rest;
     if (subcommand === undefined) {
       return {
         lines: ['usage: factory definition validate | plan | apply'],

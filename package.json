@@ -35,6 +35,7 @@
     "test:mutation:gateway": "node tools/mutate-gateway.ts",
     "test:mutation:isolation": "node tools/mutate-isolation.ts",
     "test:mutation:orchestrator": "node tools/mutate-orchestrator.ts",
+    "test:mutation:projections": "node tools/mutate-projections.ts",
     "coverage-check": "node tools/coverage-check.mjs"
   },
   "devDependencies": {
@@ -52,6 +53,7 @@
     "@factory/isolation": "workspace:*",
     "@factory/orchestrator": "workspace:*",
     "@factory/policy": "workspace:*",
+    "@factory/projections": "workspace:*",
     "@factory/state": "workspace:*",
     "@types/js-yaml": "4.0.9",
     "@types/node": "22.9.0",
