@@ -13,6 +13,12 @@
     },
     {
       "path": "../core"
+    },
+    {
+      "path": "../db"
+    },
+    {
+      "path": "../eventlog"
     }
   ]
 }

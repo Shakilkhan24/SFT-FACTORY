@@ -71,6 +71,52 @@ export default tseslint.config(
     },
   },
   {
+    // **INV-9 — the lint half.** A provider adapter may only be reached
+    // through the gateway's provider factory.
+    //
+    // blueprint 11 §9.4: "**All provider-specific behaviour is confined
+    // to the adapter** — NFR-09's acceptance criterion is exactly that."
+    //
+    // INV-9: "lint proves no provider SDK/type imported outside
+    // `gateway/providers/*` and no model-id string outside config."
+    //
+    // So the adapter modules are importable only by the factory (which
+    // constructs them) and by the gateway itself (which is handed
+    // already-constructed adapters). Every other path — a test helper,
+    // an app, a stray module — is refused.
+    //
+    // The runtime guard in `packages/gateway/src/providers/factory.ts`
+    // makes a direct call *fail*; this rule makes the direct *import*
+    // visible in review.
+    files: ['**/*.ts'],
+    ignores: [
+      'packages/gateway/src/providers/**',
+      'packages/gateway/src/gateway.ts',
+      // The package's own barrel re-exports the factory's constructors,
+      // so a consumer can build an adapter without reaching into
+      // `providers/`. The barrel is the *public* path; the rule exists
+      // to stop a consumer reaching the *private* one.
+      'packages/gateway/src/index.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/packages/gateway/src/providers/**',
+                'packages/gateway/src/providers/**',
+              ],
+              message:
+                'Provider adapters may only be reached through the gateway. Import @factory/gateway, or the adapter factory at packages/gateway/src/providers/factory.ts.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // **A0.2 — the lint half.** Adapters are constructible only inside the
     // broker module.
     //

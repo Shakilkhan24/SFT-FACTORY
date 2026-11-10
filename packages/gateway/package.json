@@ -10,5 +10,13 @@
   },
   "scripts": {
     "typecheck": "tsc --build"
+  },
+  "dependencies": {
+    "@factory/contracts": "workspace:*",
+    "@factory/core": "workspace:*",
+    "@factory/db": "workspace:*",
+    "@factory/eventlog": "workspace:*",
+    "js-yaml": "4.1.0",
+    "zod": "3.23.8"
   }
 }

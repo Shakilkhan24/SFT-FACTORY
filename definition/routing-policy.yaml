@@ -1,0 +1,112 @@
+# The routing policy — the factory's model routing.
+#
+# pack 03 §4.6 [BP: 11 §9.3]: "names are examples, `[VERIFY]` at startup".
+#
+# The **model ids below are configuration values, never code.** Decision
+# 0023: "Routing is **config only** (`routing-policy.yaml`); names are
+# examples and `[VERIFY]` against the provider's current model list at
+# startup; gateway refuses unknown models."
+#
+# So:
+#
+# * The gateway calls each provider's models list at startup and
+#   **refuses** a route that names a model the provider does not offer.
+# * No model id appears anywhere in the gateway's source — INV-9's
+#   second half, proved by `tests/unit/gateway-model-ids.test.ts`.
+# * The `secondary` provider's models are left for the operator to fill
+#   in, because the secondary provider's model list is a fact this
+#   repository cannot confirm.
+#
+# R4: changing this file changes which models the factory may call and
+# what it may spend.
+
+apiVersion: factory/v1
+kind: RoutingPolicy
+metadata:
+  name: default
+spec:
+  providers:
+    anthropic:
+      adapter: anthropic
+    secondary:
+      adapter: openai-compatible
+
+  # The classes. A class is a **primary** and its **fallbacks** — the
+  # fallback list is what the gateway walks when the primary fails.
+  #
+  # blueprint 11 §9.3: "A fallback to the same provider under the same
+  # failure mode is not a fallback." So a class never falls back to its
+  # own primary's provider — the validation refuses such a policy.
+  classes:
+    triage:
+      primary:
+        provider: anthropic
+        model: claude-haiku-5-5
+    worker:
+      primary:
+        provider: anthropic
+        model: claude-sonnet-5-5
+      fallbacks:
+        - provider: secondary
+          model: "<configured>"
+    strong:
+      primary:
+        provider: anthropic
+        model: claude-opus-5-5
+      fallbacks:
+        - provider: secondary
+          model: "<configured>"
+
+  # The rules. The **first** match wins, so the order is the operator's.
+  #
+  # A rule carries **no id**: the contracts' `RoutingPolicy` (pack 03
+  # §4.6) does not give one, and the contracts are frozen (HR-12). The
+  # gateway derives the rule's name from the class it selects.
+  rules:
+    - match:
+        role: triage
+      use: triage
+    - match:
+        role:
+          - refinement
+          - oracle-author
+          - planner
+          - reviewer
+          - reviewer-quality
+          - security-reviewer
+      use: strong
+    - match:
+        role:
+          - worker
+          - sweep
+          - ci-repair
+      use: worker
+
+  # blueprint 11 §9.3: "No correctness or governance property depends
+  # on one provider. A reviewer and an implementer may be routed to
+  # different tiers, and the review's independence is preserved by
+  # routing policy, not by luck."
+  reviewerIndependence:
+    requireDifferentRunAndContext: true
+    preferDifferentModelFromWorker: true
+
+  # The budgets, in integer micro-USD (pack 04 §6: "Costs are integer
+  # micro-USD"). The gateway checks these **before** the call.
+  budgets:
+    perRequestUsdMicros: 1500000
+    perTaskUsdMicros: 5000000
+    perWorkflowDayUsdMicros: 50000000
+
+  # The failover triggers. pack 02 §4.7: "**Budget exhaustion never
+  # fails over** — it halts with `budget.exhausted`."
+  failover:
+    on:
+      - provider-error
+      - rate-limited
+      - schema-invalid-twice
+    neverOn:
+      - budget-exhausted
+
+  # blueprint 11 §9.7: the stable prefix is cached.
+  caching:
+    prefix: true

@@ -1,0 +1,58 @@
+# The pricing table — the factory's model prices.
+#
+# pack 04 §6: "**Pricing** lives in `definition/pricing.yaml` (per-model
+# USD per million tokens, per token class) — **never hard-coded**; checked
+# against the provider's published prices at T-1.10 and monthly (reminder
+# in the Friday checklist). Costs are integer micro-USD."
+#
+# ## The units
+#
+# Every price is **micro-USD per million tokens**, as an **integer**.
+#
+# Micro-USD because "Costs are integer micro-USD" — a float cost
+# accumulates error, and the error lands on the *budget* check, where a
+# request that costs 1499999.9999 micro-USD instead of 1500000 either
+# slips past a ceiling that should have stopped it or stops a request
+# that should have been allowed.
+#
+# Per million because that is the unit the providers publish.
+#
+# ## The four token classes
+#
+# `input`, `output`, `cacheRead`, `cacheWrite` — pack 04 §6: "usage
+# fields for input/output/cache read/cache write tokens". A cache read is
+# cheaper than a fresh input token and a cache write costs more than an
+# ordinary input, so the classes cannot be collapsed.
+#
+# ## The prices below are placeholders
+#
+# They are **not** verified against a provider's published prices — the
+# corpus marks the price list `[VERIFY]` and this repository cannot
+# confirm it. The ticket's oracle asks for **integer micro-USD golden
+# cost tests**, which is what the price *arithmetic* is proved against;
+# the numbers themselves are the operator's to set.
+#
+# An unpriced model is **refused** by the gateway, not treated as free —
+# so a model missing from this table cannot be routed to by accident.
+#
+# R4: changing this file changes what the factory may spend.
+
+apiVersion: factory/v1
+kind: PricingTable
+spec:
+  models:
+    claude-haiku-5-5:
+      inputPerMillionUsdMicros: 100000
+      outputPerMillionUsdMicros: 500000
+      cacheReadPerMillionUsdMicros: 10000
+      cacheWritePerMillionUsdMicros: 125000
+    claude-sonnet-5-5:
+      inputPerMillionUsdMicros: 300000
+      outputPerMillionUsdMicros: 1500000
+      cacheReadPerMillionUsdMicros: 30000
+      cacheWritePerMillionUsdMicros: 375000
+    claude-opus-5-5:
+      inputPerMillionUsdMicros: 1500000
+      outputPerMillionUsdMicros: 7500000
+      cacheReadPerMillionUsdMicros: 150000
+      cacheWritePerMillionUsdMicros: 1875000
