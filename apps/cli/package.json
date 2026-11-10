@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@factory/contracts": "workspace:^",
+    "@factory/core": "workspace:^",
     "@factory/db": "workspace:^",
+    "@factory/definition": "workspace:^",
     "@factory/eventlog": "workspace:^",
     "kysely": "0.27.4"
   }

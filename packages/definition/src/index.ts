@@ -1,57 +1,103 @@
 /**
- * `definition` — loading the factory's definition documents.
+ * `definition` — loading, validating, planning and applying the factory's
+ * definition documents.
  *
- * pack 02 §3: `definition` is **not** in the pure set (`policy`, `state`,
- * `context`, `review`, `merge`), because loading a definition is I/O — it
- * reads files from disk. The pure packages take the *parsed* value; this
- * package turns bytes into a value.
+ * pack 02 §4.1: "Definition store and applier [BP: ADR-0001, 09 §9, 07 §4.1]".
  *
- * The one document this ticket delivers is `definition/policy-bundle.yaml`
- * (pack 03 §4.7). The loader parses the YAML, validates it against the
- * `PolicyBundle` contract, and computes the digest the decisions carry.
+ * The package has five parts:
+ *
+ * * `documents.ts` — the **pure** half: validate documents against the
+ *   contracts and assemble them into a bundle with its digest.
+ * * `loader.ts` — the **I/O** half: read the definition directory.
+ * * `plan.ts` — the structured diff between two bundles.
+ * * `apply.ts` — the applier, with its three preconditions.
+ * * `drift.ts` — the **pure** half of the drift check.
+ * * `drift-job.ts` — the drift job, which appends `definition.driftDetected`
+ *   and never corrects.
+ *
+ * The package is **not** in the pure set (pack 02 §3): reading a definition
+ * is I/O. The pure halves are still pure — `documents.ts`, `plan.ts`,
+ * `apply.ts` and `drift.ts` take their inputs as values and do no I/O of
+ * their own; the `DefinitionVersionStore` and `DefinitionScmCheck` ports are
+ * how the applier reaches the database and the SCM without depending on
+ * either.
  */
 
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+export {
+  DEFINITION_SCHEMAS,
+  claimedKind,
+  definitionBundleCanonicalJson,
+  definitionBundleSha256,
+  validateBundle,
+  validateDocument,
+  type AnyDefinitionDocument,
+  type BundleValidation,
+  type DefinitionBundle,
+  type DefinitionDocumentOf,
+  type DocumentValidationFailure,
+  type RawDocument,
+} from './documents.js';
 
-import yaml from 'js-yaml';
+export {
+  DEFINITION_ROOT,
+  loadDefinition,
+  readRawDocuments,
+  type LoadFailure,
+  type LoadResult,
+} from './loader.js';
 
-import { loadPolicyBundle, type LoadedPolicyBundle } from '@factory/policy';
+export {
+  planBetween,
+  renderPlan,
+  type ChangeKind,
+  type DefinitionChange,
+  type DefinitionPlan,
+} from './plan.js';
 
-/**
- * The repository's `definition/` directory.
- *
- * The path is resolved from this file's location — `packages/definition/src`
- * — so the loader works regardless of the process's working directory.
- */
-export const DEFINITION_ROOT = resolve(import.meta.dirname, '..', '..', '..', 'definition');
+export {
+  APPLIER_ROLE,
+  APPLY_REFUSALS,
+  applyDefinition,
+  checkApproval,
+  type ApplyOptions,
+  type ApplyOutcome,
+  type ApplyRefusal,
+  type ApplyRefusalDetail,
+  type DefinitionApprovalInput,
+  type DefinitionScmCheck,
+  type DefinitionVersionStore,
+} from './apply.js';
 
-/**
- * Parse and validate a policy bundle document.
- *
- * @param source the YAML text.
- * @returns the validated bundle and its digest.
- * @throws {ZodError} when the document is not a valid policy bundle.
- */
-export const parsePolicyBundle = (source: string): LoadedPolicyBundle => {
-  const parsed: unknown = yaml.load(source);
-  return loadPolicyBundle(parsed);
-};
+export {
+  DRIFT_KINDS,
+  checkDrift,
+  type DriftFinding,
+  type DriftInputs,
+  type DriftKind,
+  type DriftReport,
+} from './drift.js';
 
-/**
- * Read `definition/policy-bundle.yaml` and return the validated bundle.
- *
- * @param root the definition directory. Defaults to the repository's.
- */
-export const readPolicyBundle = async (
-  root: string = DEFINITION_ROOT,
-): Promise<LoadedPolicyBundle> => {
-  const source = await readFile(resolve(root, 'policy-bundle.yaml'), 'utf8');
-  return parsePolicyBundle(source);
-};
+export {
+  DRIFT_EVENT_TYPE,
+  driftEventPayload,
+  runDriftJob,
+  type AppliedVersionReader,
+  type DriftEventPayload,
+  type DriftEventSink,
+  type DriftJobInputs,
+  type DriftJobOutcome,
+  type DriftRepository,
+} from './drift-job.js';
 
-/**
- * The package's name — the scaffold's original export, kept so the
- * dependency rules and the baseline test still see the same surface.
- */
-export const packageName = 'definition';
+export { PostgresDefinitionVersionStore } from './postgres-store.js';
+
+export {
+  PostgresApprovalReader,
+  rowToApproval,
+  type ApprovalReader,
+} from './approval-reader.js';
+
+export {
+  parsePolicyBundle,
+  readPolicyBundle,
+} from './policy-bundle.js';

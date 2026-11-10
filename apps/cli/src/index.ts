@@ -11,7 +11,15 @@
 
 import { runDbCommand } from './db.js';
 import { defaultMigrationsDir } from './db.js';
+import { runDefinitionCommand } from './definition.js';
+import {
+  buildDefinitionStore,
+  parseArgs,
+  refusingScmCheck,
+  resolveApproval,
+} from './definition-wiring.js';
 import { runEventsCommand } from './events.js';
+import { resolveDefinitionDirectory } from './paths.js';
 
 const USAGE = `usage: factory <command> [options]
 
@@ -28,11 +36,19 @@ commands:
                          show one aggregate's chain and its chain verdict
   events health          report seq gaps and aggregate-version gaps
 
+  definition validate    check every definition document against its contract
+  definition plan        show the structured diff against the applied version
+  definition apply --sha <sha> [--approval <id>]
+                         apply a definition SHA (needs a bound approval)
+
 environment:
   FACTORY_OWNER_DATABASE_URL   connection string for the factory_owner role
   FACTORY_PROJECTOR_DATABASE_URL
                                connection string for the factory_projector role
+  FACTORY_APPLIER_DATABASE_URL
+                               connection string for the factory_applier role
   FACTORY_MIGRATIONS_DIR       override the migrations directory
+  FACTORY_DEFINITION_DIR       override the definition directory
 `;
 
 export interface CliResult {
@@ -100,7 +116,7 @@ export const run = async (
       subcommand,
       {
         connectionString,
-        migrationsDir: defaultMigrationsDir(),
+        migrationsDir: defaultMigrationsDir(environment),
         mode: ownerRoleMode(environment),
       },
       subArgs,
@@ -139,6 +155,55 @@ export const run = async (
       },
       subArgs,
     );
+  }
+
+  if (command === 'definition') {
+    const [subcommand, ...subArgs] = rest;
+    if (subcommand === undefined) {
+      return {
+        lines: ['usage: factory definition validate | plan | apply'],
+        exitCode: 2,
+      };
+    }
+
+    const parsed = parseArgs(subArgs);
+    const sha = typeof parsed.flags['sha'] === 'string' ? parsed.flags['sha'] : undefined;
+    const approvalId =
+      typeof parsed.flags['approval'] === 'string' ? parsed.flags['approval'] : undefined;
+
+    // The applier needs the **applier** role, so the connection string is
+    // the applier's. The owner role is accepted as a fallback for the dev
+    // cluster, where the roles are group roles assumed over one connection.
+    const connectionString =
+      environment['FACTORY_APPLIER_DATABASE_URL'] ??
+      environment['FACTORY_OWNER_DATABASE_URL'];
+
+    const definitionRoot = resolveDefinitionDirectory(environment);
+
+    const { store, approvals, destroy } = buildDefinitionStore({
+      definitionRoot,
+      connectionString,
+      mode: ownerRoleMode(environment),
+      appliedBy: environment['FACTORY_OWNER_LOGIN'],
+      approvalId,
+      sha,
+    });
+
+    try {
+      return await runDefinitionCommand(
+        subcommand,
+        {
+          definitionRoot,
+          scm: refusingScmCheck(),
+          store,
+          approval: await resolveApproval(approvalId, approvals),
+          appliedBy: environment['FACTORY_OWNER_LOGIN'] ?? 'unknown',
+          sha,
+        },
+      );
+    } finally {
+      await destroy();
+    }
   }
 
   return {

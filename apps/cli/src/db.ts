@@ -177,4 +177,6 @@ export const runDbCommand = async (
 /**
  * Where the migration files live, relative to the repository root.
  */
-export const defaultMigrationsDir = (): string => resolveMigrationDirectory();
+export const defaultMigrationsDir = (
+  environment: NodeJS.ProcessEnv = process.env,
+): string => resolveMigrationDirectory(environment);

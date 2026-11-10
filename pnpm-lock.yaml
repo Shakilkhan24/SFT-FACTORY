@@ -11,6 +11,48 @@ importers:
       '@eslint/js':
         specifier: 9.15.0
         version: 9.15.0
+      '@factory/approvals':
+        specifier: workspace:*
+        version: link:packages/approvals
+      '@factory/artefacts':
+        specifier: workspace:*
+        version: link:packages/artefacts
+      '@factory/broker':
+        specifier: workspace:*
+        version: link:packages/broker
+      '@factory/contracts':
+        specifier: workspace:*
+        version: link:packages/contracts
+      '@factory/core':
+        specifier: workspace:*
+        version: link:packages/core
+      '@factory/credentials':
+        specifier: workspace:*
+        version: link:packages/credentials
+      '@factory/db':
+        specifier: workspace:*
+        version: link:packages/db
+      '@factory/definition':
+        specifier: workspace:*
+        version: link:packages/definition
+      '@factory/eventlog':
+        specifier: workspace:*
+        version: link:packages/eventlog
+      '@factory/gateway':
+        specifier: workspace:*
+        version: link:packages/gateway
+      '@factory/isolation':
+        specifier: workspace:*
+        version: link:packages/isolation
+      '@factory/orchestrator':
+        specifier: workspace:*
+        version: link:packages/orchestrator
+      '@factory/policy':
+        specifier: workspace:*
+        version: link:packages/policy
+      '@factory/state':
+        specifier: workspace:*
+        version: link:packages/state
       '@types/js-yaml':
         specifier: 4.0.9
         version: 4.0.9
@@ -46,9 +88,15 @@ importers:
       '@factory/contracts':
         specifier: workspace:^
         version: link:../../packages/contracts
+      '@factory/core':
+        specifier: workspace:^
+        version: link:../../packages/core
       '@factory/db':
         specifier: workspace:^
         version: link:../../packages/db
+      '@factory/definition':
+        specifier: workspace:^
+        version: link:../../packages/definition
       '@factory/eventlog':
         specifier: workspace:^
         version: link:../../packages/eventlog
@@ -107,12 +155,18 @@ importers:
       '@factory/core':
         specifier: workspace:*
         version: link:../core
+      '@factory/db':
+        specifier: workspace:*
+        version: link:../db
       '@factory/policy':
         specifier: workspace:*
         version: link:../policy
       js-yaml:
         specifier: 4.1.0
         version: 4.1.0
+      kysely:
+        specifier: 0.27.4
+        version: 0.27.4
 
   packages/eventlog:
     dependencies:

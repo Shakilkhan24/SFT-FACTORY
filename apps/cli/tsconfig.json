@@ -16,6 +16,12 @@
     },
     {
       "path": "../../packages/eventlog"
+    },
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/definition"
     }
   ]
 }
