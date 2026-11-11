@@ -46,6 +46,7 @@ export {
   type ModelRef,
   type NodeRecord,
   type Outcome,
+  type PolicyDecisionRecord,
   type ProducedArtefact,
   type PromptRecord,
   type RecordLocation,

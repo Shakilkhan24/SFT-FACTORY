@@ -22,6 +22,8 @@ import { Kysely, PostgresDialect } from 'kysely';
 // "does not provide an export named 'Pool'".)
 import pg from 'pg';
 
+import type { PoolClient, PoolConfig } from 'pg';
+
 const { Pool } = pg;
 
 import type { FactoryDatabase } from './types.js';
@@ -85,6 +87,29 @@ export interface ConnectionConfig {
 const DEFAULT_MAX = 10;
 
 /**
+ * The `pg-pool` options this module uses beyond `pg`'s own `PoolConfig`.
+ *
+ * `pg-pool` is the pool `pg` uses, and it supports an `onConnect` hook that
+ * it **awaits** before releasing a client to a borrower. `@types/pg`
+ * declares `PoolConfig` without it — `pg-pool` ships no types of its own,
+ * so the option is real at runtime but invisible to the compiler.
+ *
+ * The declaration is a **widening**, not a replacement: the config type is
+ * `pg`'s own, plus this one option. So a typo in any other option is still
+ * a compile error, and only `onConnect` — the one option with no declared
+ * type — is accepted.
+ */
+interface FactoryPoolConfig extends PoolConfig {
+  /**
+   * Called with each new client, before the pool releases it.
+   *
+   * The returned promise is awaited: if it rejects, the connection is
+   * closed and the borrower receives the error.
+   */
+  readonly onConnect?: (client: PoolClient) => Promise<unknown>;
+}
+
+/**
  * The default connection timeout.
  *
  * Ten seconds is long enough for a slow TLS handshake on a real cluster
@@ -97,18 +122,27 @@ const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
  *
  * Two statements, in this order:
  *
- *  1. `SET search_path TO factory, public` — so unqualified names resolve to
+ *  1. `SET ROLE <role>` — only in `assume` mode.
+ *  2. `SET search_path TO factory, public` — so unqualified names resolve to
  *     the factory schema, the same discipline the pack's own DDL uses.
- *  2. `SET ROLE <role>` — only in `assume` mode. It comes *after* the
- *     search_path because `SET ROLE` resets the session's search_path to the
- *     role's default.
+ *
+ * **The order matters, and it is the opposite of what it looks like.**
+ * `SET ROLE` resets the session's `search_path` to the target role's
+ * default (`"$user", public`). So a preamble that sets the search_path
+ * *first* and the role *second* throws the search_path away: the session
+ * ends up searching `"$user", public`, where the unqualified name `tasks`
+ * does not resolve — and the failure reads as `relation "tasks" does not
+ * exist`, which points at the schema rather than at the preamble.
+ *
+ * Setting the role first and the search_path second means the search_path
+ * is the last thing written, so it is the state the session is left in.
  *
  * Both are issued on every pooled connection, because a pooled connection may
  * be handed to a different caller between uses.
  */
 const sessionPreamble = (role: FactoryRole, mode: ConnectionMode): string =>
   mode === 'assume'
-    ? `SET search_path TO factory, public; SET ROLE ${role}`
+    ? `SET ROLE ${role}; SET search_path TO factory, public`
     : 'SET search_path TO factory, public';
 
 /**
@@ -120,22 +154,37 @@ const sessionPreamble = (role: FactoryRole, mode: ConnectionMode): string =>
  */
 export const createDatabase = (config: ConnectionConfig): Kysely<FactoryDatabase> => {
   const mode: ConnectionMode = config.mode ?? 'direct';
-  const pool = new Pool({
+  const statement = sessionPreamble(config.role, mode);
+
+  const poolConfig: FactoryPoolConfig = {
     connectionString: config.connectionString,
     max: config.max ?? DEFAULT_MAX,
     // `pg` retries a failed connection rather than giving up, so this is
     // what turns an unreachable host into an error instead of a hang.
     connectionTimeoutMillis: config.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS,
-  });
+    // The preamble is **awaited** before the client is handed to a
+    // borrower.
+    //
+    // The obvious alternative — `pool.on('connect', client => void
+    // client.query(statement))` — looks equivalent and is not. `pg`'s
+    // `connect` event fires *before* the pool releases the client, but a
+    // fire-and-forget `client.query` is only *queued* on that client; the
+    // borrower's first query is issued on its own path and can overtake
+    // it. The observable symptom is that the **first** query on a fresh
+    // pool resolves unqualified names against `public` and fails with
+    // `relation "tasks" does not exist`, while every later query on the
+    // same pooled connection succeeds. That is a race, so it is not
+    // reliably reproducible — it is a defect that would surface in
+    // production as an intermittent "table does not exist" on a cold
+    // start.
+    //
+    // `onConnect` is `pg-pool`'s own hook, and `pg-pool` awaits the
+    // promise it returns before releasing the client. So the preamble is
+    // guaranteed to have landed before any borrower sees the connection.
+    onConnect: (client) => client.query(statement),
+  };
 
-  const statement = sessionPreamble(config.role, mode);
-  pool.on('connect', (client) => {
-    // `pg` emits `connect` before the connection is handed to a borrower, and
-    // `pg` serialises queries on a single client — so this preamble runs
-    // before any borrower query on the same connection. The `void` is safe:
-    // the client's internal query queue keeps the ordering.
-    void client.query(statement);
-  });
+  const pool = new Pool(poolConfig);
 
   return new Kysely<FactoryDatabase>({
     dialect: new PostgresDialect({ pool }),

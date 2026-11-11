@@ -131,7 +131,7 @@ export class PostgresProjectionStore implements ProjectionStore {
       state: string;
       risk_tier: string | null;
       needs_human: boolean;
-      last_activity_at: string | null;
+      last_activity_at: Date | string | null;
       spent_usd_micros: string | number;
       budget_usd_micros: string | number;
       summary: unknown;
@@ -150,7 +150,7 @@ export class PostgresProjectionStore implements ProjectionStore {
         state: row.state,
         riskTier: row.risk_tier,
         needsHuman: row.needs_human,
-        lastActivityAt: row.last_activity_at ?? '',
+        lastActivityAt: toIso(row.last_activity_at),
         spentUsdMicros: Number(row.spent_usd_micros),
         budgetUsdMicros: Number(row.budget_usd_micros),
         summary: (row.summary ?? {}) as Record<string, unknown>,
@@ -320,6 +320,31 @@ export class PostgresProjectionStore implements ProjectionStore {
     `.execute(trx);
   }
 }
+
+/**
+ * A timestamp as an ISO string.
+ *
+ * `pg` returns a `timestamptz` as a `Date`; a row written by another
+ * tool may come back as a string, so both are accepted.
+ *
+ * This normalisation is **not** cosmetic. The row's `lastActivityAt` is
+ * typed a `string`, and the row's digest is taken over its canonical
+ * JSON — and `canonicalJson` represents plain objects and arrays only,
+ * so a `Date` left in the row makes the digest **throw**. That is not a
+ * theoretical concern: A0.6's "drop-and-rebuild ⇒ identical rows (hash
+ * compare)" is exactly the digest, so a `Date` in the row breaks the
+ * rebuild oracle outright.
+ *
+ * The same normalisation is the repo's own precedent
+ * (`packages/credentials`' lease store does the same for its
+ * timestamps).
+ */
+const toIso = (value: Date | string | null): string => {
+  if (value === null) {
+    return '';
+  }
+  return value instanceof Date ? value.toISOString() : value;
+};
 
 /**
  * Split a namespaced key into its projection and its key.

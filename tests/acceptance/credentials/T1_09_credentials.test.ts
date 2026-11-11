@@ -86,7 +86,7 @@ describe('T-1.09 — the credential leases, against Postgres', () => {
     if (!running) {
       return;
     }
-    postgres = await createPostgres('credentials_acceptance');
+    postgres = await createPostgres('factory_t1_09_credentials');
     db = createDatabase({
       connectionString: postgres.superuserUrl,
       role: 'factory_owner',

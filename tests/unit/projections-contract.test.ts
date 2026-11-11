@@ -146,6 +146,18 @@ const storeContract = (
         expect(row.riskTier).toBe('R1');
         expect(row.needsHuman).toBe(true);
         expect(row.spentUsdMicros).toBe(1200);
+
+        // The timestamp is a **string**, not a `Date`.
+        //
+        // This assertion is not decoration: `last_activity_at` is a
+        // `timestamptz`, and `pg` hands a `timestamptz` back as a `Date`.
+        // The row's type says `string`, and `canonicalJson` represents
+        // plain objects and arrays only — so a `Date` left in the row
+        // makes `rowsDigest` **throw**, and A0.6's "drop-and-rebuild ⇒
+        // identical rows (hash compare)" fails outright. That is exactly
+        // the failure this assertion now prevents from coming back.
+        expect(typeof row.lastActivityAt).toBe('string');
+        expect(row.lastActivityAt).toBe('2026-11-10T00:03:00.000Z');
       } finally {
         await destroy();
       }

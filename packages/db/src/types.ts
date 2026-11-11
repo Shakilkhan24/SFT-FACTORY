@@ -177,6 +177,15 @@ export interface RunsTable {
   cost_usd_micros: Generated<number>;
   tokens: Generated<Json>;
   retention_class: Generated<string>;
+  /**
+   * The `date` column.
+   *
+   * `pg` parses a `date` (OID 1082) into a **JS `Date`**, whose
+   * `toString()` is a locale-dependent rendering — so code that needs the
+   * ISO date must select the column as `retain_until::text`. The
+   * artefacts store does exactly that, because the purge's selection is a
+   * lexicographic comparison of ISO dates.
+   */
   retain_until: Generated<Date>;
 }
 

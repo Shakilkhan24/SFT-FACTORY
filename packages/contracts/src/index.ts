@@ -31,3 +31,4 @@ export * from './services.js';
 export * from './definitions.js';
 export * from './json-schema.js';
 export * from './schema-registry.js';
+export * from './export.js';

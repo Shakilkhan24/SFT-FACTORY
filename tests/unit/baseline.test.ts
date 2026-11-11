@@ -37,6 +37,30 @@ const git = async (repo: string, args: readonly string[]): Promise<void> => {
 };
 
 /**
+ * The JSON report the baseline tool wrote.
+ *
+ * The tool names the file `pre-factory-<today>.json`, where *today* is the
+ * day the tool ran — so the name moves with the calendar. The tool prints
+ * the path it wrote, and that is what this reads.
+ *
+ * The earlier version of this test hard-coded `pre-factory-2026-11-09.json`,
+ * which made it a **time bomb**: it passed on the day it was written and
+ * failed on every day after. A test that is only green on one date is not
+ * a test.
+ */
+const readReport = async (stdout: string): Promise<Record<string, unknown>> => {
+  const line = stdout
+    .split('\n')
+    .find((entry) => entry.trim().startsWith('json:'));
+  expect(line, `the tool printed no json path:\n${stdout}`).toBeDefined();
+
+  const path = line?.trim().slice('json:'.length).trim() ?? '';
+  expect(path).not.toBe('');
+
+  return JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+};
+
+/**
  * A fixture repository with a known history: three merged PRs with known review rounds,
  * known sizes and known lead times, plus a revert.
  *
@@ -131,8 +155,7 @@ describe('tools/baseline (T-0.04)', () => {
       );
       expect(result.exitCode).toBe(0);
 
-      const files = await readFile(join(out, 'pre-factory-2026-11-09.json'), 'utf8');
-      const report = JSON.parse(files) as {
+      const report = (await readReport(result.stdout)) as {
         metrics: Record<string, { count?: number; p50?: number; value?: number | null }>;
         mergeCount: number;
       };
@@ -162,11 +185,11 @@ describe('tools/baseline (T-0.04)', () => {
     await mkdir(repo, { recursive: true });
     try {
       await buildFixture(repo);
-      await run(['--repo', repo, '--out', out, '--days', '3650'], repoRoot);
+      const result = await run(['--repo', repo, '--out', out, '--days', '3650'], repoRoot);
 
-      const report = JSON.parse(
-        await readFile(join(out, 'pre-factory-2026-11-09.json'), 'utf8'),
-      ) as { dora: { available: boolean; reason: string } };
+      const report = (await readReport(result.stdout)) as {
+        dora: { available: boolean; reason: string };
+      };
 
       // A DORA number that cannot be measured must not be printed as a number.
       expect(report.dora.available).toBe(false);

@@ -5,11 +5,15 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "bin": {
+    "factory": "./dist/bin.js"
+  },
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --build"
+    "typecheck": "tsc --build",
+    "build": "tsc --build"
   },
   "dependencies": {
     "@factory/contracts": "workspace:^",

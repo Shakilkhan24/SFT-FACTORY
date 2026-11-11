@@ -12,7 +12,9 @@
     "typecheck": "tsc --build"
   },
   "dependencies": {
+    "@factory/artefacts": "workspace:*",
     "@factory/contracts": "workspace:*",
+    "@factory/core": "workspace:*",
     "@factory/db": "workspace:*",
     "@factory/eventlog": "workspace:*",
     "@factory/state": "workspace:*"

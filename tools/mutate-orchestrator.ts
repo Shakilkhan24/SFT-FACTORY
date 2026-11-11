@@ -349,7 +349,7 @@ const MUTATIONS: readonly Mutation[] = [
       return Promise.resolve();
     }`,
     replace: `    // MUTATION: the finished run is resurrected.`,
-    test: 'tests/unit/orchestrator-a0-5.test.ts',
+    test: 'tests/fault/a0-5.test.ts',
   },
   {
     name: 'the first committed result no longer wins',
@@ -358,7 +358,30 @@ const MUTATIONS: readonly Mutation[] = [
       return Promise.resolve({ applied: false, winnerRunId: existing.runId });
     }`,
     replace: `    // MUTATION: the second result is applied too.`,
-    test: 'tests/unit/orchestrator-a0-5.test.ts',
+    test: 'tests/fault/a0-5.test.ts',
+  },
+
+  // ---- the context resolution (A0.4) ------------------------------------
+  //
+  // This mutation is here because the A0.4 oracle was **missing** when
+  // the G1 pack was written, and the first version of the test that
+  // closed the gap compared `outcome.record` — which is `undefined`,
+  // because the outcome carries the record's *location*, not the
+  // record. `toEqual(undefined, undefined)` passed against a build
+  // whose context resolution was random. This mutation is what caught
+  // that, and it is kept so the mistake cannot come back.
+  {
+    name: 'the resolved context digest becomes random',
+    file: 'packages/orchestrator/src/hello/record-executor.ts',
+    search: `      context: this.#options.context,`,
+    replace: `      context: {
+        ...this.#options.context,
+        manifest: {
+          ...this.#options.context.manifest,
+          resolvedContextSha256: \`sha256:\${String(Math.random()).slice(2).padEnd(64, '0')}\`,
+        },
+      },`,
+    test: 'tests/unit/orchestrator-a0-4-identical-context.test.ts',
   },
 ];
 

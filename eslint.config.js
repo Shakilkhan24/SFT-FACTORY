@@ -42,6 +42,7 @@ export default tseslint.config(
       'tools/context-bundle',
       'tools/export-schemas.ts',
       'tools/extract-pack-ddl.ts',
+      'tools/hello-run.ts',
       'apps/cli/src/index.ts',
     ],
     languageOptions: {
@@ -58,7 +59,23 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
-      globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly' },
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        // The standard globals Node provides. `URL` is here because
+        // `tools/compiled-resolver.mjs` builds its package URLs with it,
+        // and `no-undef` is **on** for these files — a script that
+        // referenced `URL` without declaring it would fail the lint, and
+        // the fix is to declare the global rather than to switch the
+        // rule off.
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        TextEncoder: 'readonly',
+        TextDecoder: 'readonly',
+        structuredClone: 'readonly',
+        fetch: 'readonly',
+      },
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],

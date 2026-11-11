@@ -36,7 +36,7 @@ import {
   resolveApproval,
 } from './definition-wiring.js';
 import { runEventsCommand } from './events.js';
-import { resolveDefinitionDirectory } from './paths.js';
+import { resolveDefinitionDirectory, resolveContractsDistDirectory, resolveSchemasDirectory } from './paths.js';
 import { runProjectionsCommand, PROJECTIONS_SUBCOMMANDS } from './projections.js';
 import { DEFAULT_API_URL } from './client.js';
 import { runKillSwitch } from './kill-switch.js';
@@ -48,6 +48,7 @@ import {
   type AccessPointOptions,
 } from './tasks.js';
 import { runAuditChain, PostgresChainVerifier, type ChainVerifier } from './audit.js';
+import { runDoctor } from './doctor.js';
 
 const USAGE = `usage: factory <command> [options]
 
@@ -74,6 +75,9 @@ commands:
   definition plan        show the structured diff against the applied version
   definition apply --sha <sha> [--approval <id>]
                          apply a definition SHA (needs a bound approval)
+
+  doctor                 check the local environment and name every failure
+                         (exit 1 if any check failed)
 
   login --token fac_…    store a CLI token and prove it works
   whoami                 show who the stored token is
@@ -144,6 +148,20 @@ const accessPointOptions = (
   apiUrl: apiUrl(environment),
   environment,
 });
+
+/**
+ * The schemas directory the doctor compares the export against.
+ */
+const schemasDir = (
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined => resolveSchemasDirectory(environment);
+
+/**
+ * The contracts' compiled output — what the export is compared against.
+ */
+const contractsDistDir = (
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined => resolveContractsDistDirectory(environment);
 
 /**
  * Build the chain verifier the `audit chain` command uses.
@@ -352,6 +370,41 @@ export const run = async (
     } finally {
       await destroy();
     }
+  }
+
+  if (command === 'doctor') {
+    // The doctor needs a database, but it says so **before** it fails:
+    // "no connection string" and "the database is unreachable" are
+    // different problems, and the operator needs to be told which one
+    // they have.
+    const connectionString = ownerConnectionString(environment);
+    if (connectionString === undefined) {
+      return {
+        lines: [
+          'FACTORY_OWNER_DATABASE_URL is not set.',
+          'The doctor checks the database, the migrations, the event log,',
+          'the hash chains and the schema export, so it needs a database.',
+        ],
+        exitCode: 2,
+      };
+    }
+
+    const { buildDoctorChecks } = await import('./doctor-checks.js');
+    const resolvedSchemasDir = schemasDir(environment);
+    const resolvedContractsDist = contractsDistDir(environment);
+    return runDoctor({
+      checks: buildDoctorChecks({
+        connectionString,
+        migrationsDir: defaultMigrationsDir(environment),
+        mode: ownerRoleMode(environment),
+        ...(resolvedSchemasDir === undefined
+          ? {}
+          : { schemasDir: resolvedSchemasDir }),
+        ...(resolvedContractsDist === undefined
+          ? {}
+          : { contractsDistDir: resolvedContractsDist }),
+      }),
+    });
   }
 
   // ---- the access-point commands ---------------------------------------

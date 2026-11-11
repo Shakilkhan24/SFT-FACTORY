@@ -504,28 +504,63 @@ export class ToolBroker {
       actor: context.actor,
     };
 
-    await this.#options.store.record(record, {
-      eventType: 'tool.invoked',
-      aggregate: { kind: 'task', id: context.taskId, version: 0 },
-      correlationId: context.runId,
-      actor: context.actor,
-      authority: {
-        basis: 'policy-decision',
-        ...(approvalId === undefined ? {} : { approvalId }),
-        autonomyLevel: context.autonomy,
-      },
-      payload: {
-        runId: context.runId,
-        capabilityId: capability.capability.id,
-        effectClass: capability.capability.effect.class,
-        argsSha256,
-        argsSummary: record.argsSummary,
-        resultSummary: record.resultSummary,
-        transport: capability.capability.transport,
-        idempotencyKey,
-        durationMs,
-      },
-    });
+    // ---- Step 10: the invocation record ---------------------------------
+    //
+    // The row and the event are written in **one** transaction (blueprint
+    // 09 §6: "State transitions and their events are written in one
+    // transaction"), so a failure here leaves **neither** — the event log
+    // can never claim a call the table does not record, and the table can
+    // never record a call the log does not know about.
+    //
+    // A failure of the write is a **terminal failure of the call**, not a
+    // thrown exception. The capability has already run: its side effect
+    // may have happened, and the caller must be told the call did not
+    // complete rather than have the exception escape as an unhandled
+    // throw from a method whose contract is to return an outcome.
+    //
+    // So the write is guarded, and a failure becomes a refusal at step
+    // 10. The failure class is `tool.unavailable` — the call cannot be
+    // shown to have worked, which is the same class an adapter failure
+    // carries (blueprint 11 §6.3).
+    //
+    // **No second write is attempted.** The store is what failed; asking
+    // it again to record the failure would fail the same way, and the
+    // attempt would double the evidence of a broken store. So the refusal
+    // is reported to the caller and the event log learns nothing — which
+    // is the honest outcome: the call happened and could not be recorded,
+    // and the gap is visible to whoever reconciles the log against the
+    // table (INV-3).
+    try {
+      await this.#options.store.record(record, {
+        eventType: 'tool.invoked',
+        aggregate: { kind: 'task', id: context.taskId, version: 0 },
+        correlationId: context.runId,
+        actor: context.actor,
+        authority: {
+          basis: 'policy-decision',
+          ...(approvalId === undefined ? {} : { approvalId }),
+          autonomyLevel: context.autonomy,
+        },
+        payload: {
+          runId: context.runId,
+          capabilityId: capability.capability.id,
+          effectClass: capability.capability.effect.class,
+          argsSha256,
+          argsSummary: record.argsSummary,
+          resultSummary: record.resultSummary,
+          transport: capability.capability.transport,
+          idempotencyKey,
+          durationMs,
+        },
+      });
+    } catch (error) {
+      return this.#failure(
+        'record',
+        steps,
+        `the invocation could not be recorded, so the call cannot be shown to have completed: ${describe(error)}`,
+        BROKER_FAILURE_CLASSES.unavailable,
+      );
+    }
 
     return {
       ok: true,
@@ -833,22 +868,32 @@ export class ToolBroker {
       actor: context.actor,
     };
 
-    await this.#options.store.record(record, {
-      eventType: 'tool.failed',
-      aggregate: { kind: 'task', id: context.taskId, version: 0 },
-      correlationId: context.runId,
-      actor: context.actor,
-      authority: {
-        basis: 'policy-decision',
-        ...(approvalId === undefined ? {} : { approvalId }),
-        autonomyLevel: context.autonomy,
-      },
-      payload: {
-        runId: context.runId,
-        capabilityId: capability.id,
-        reason,
-      },
-    });
+    try {
+      await this.#options.store.record(record, {
+        eventType: 'tool.failed',
+        aggregate: { kind: 'task', id: context.taskId, version: 0 },
+        correlationId: context.runId,
+        actor: context.actor,
+        authority: {
+          basis: 'policy-decision',
+          ...(approvalId === undefined ? {} : { approvalId }),
+          autonomyLevel: context.autonomy,
+        },
+        payload: {
+          runId: context.runId,
+          capabilityId: capability.id,
+          reason,
+        },
+      });
+    } catch {
+      // The failure is still a failure.
+      //
+      // The caller is told the capability could not be executed either
+      // way; a failure of the *record* must not replace that refusal with
+      // an exception. The attempted call is evidence — and the gap
+      // between the table and the log is exactly what INV-3's
+      // reconciliation looks for.
+    }
   }
 
   /**
@@ -919,26 +964,41 @@ export class ToolBroker {
       actor: context.actor,
     };
 
-    await this.#options.store.record(record, {
-      eventType: 'tool.denied',
-      aggregate: { kind: 'task', id: context.taskId, version: 0 },
-      correlationId: context.runId,
-      actor: context.actor,
-      authority: {
-        basis: 'policy-decision',
-        autonomyLevel: context.autonomy,
-        // A denial is a *violation* of the intended authority: the call was
-        // attempted and refused.
-        violation: true,
-      },
-      payload: {
-        runId: context.runId,
-        capabilityId: capability.id,
-        step: stepNumberOf(step),
-        ruleIds: [...ruleIds],
-        reason,
-      },
-    });
+    try {
+      await this.#options.store.record(record, {
+        eventType: 'tool.denied',
+        aggregate: { kind: 'task', id: context.taskId, version: 0 },
+        correlationId: context.runId,
+        actor: context.actor,
+        authority: {
+          basis: 'policy-decision',
+          autonomyLevel: context.autonomy,
+          // A denial is a *violation* of the intended authority: the call
+          // was attempted and refused.
+          violation: true,
+        },
+        payload: {
+          runId: context.runId,
+          capabilityId: capability.id,
+          step: stepNumberOf(step),
+          ruleIds: [...ruleIds],
+          reason,
+        },
+      });
+    } catch {
+      // A denial that cannot be recorded is still a denial.
+      //
+      // The refusal itself is the fact that matters — the call was
+      // attempted and refused — and the caller is told about it either
+      // way. Swallowing the write failure keeps the *refusal* observable
+      // to the caller: the alternative is an exception escaping from
+      // `invoke`, which loses the refusal's reason, its step and its
+      // class, and reports a crash instead of a gate that did its job.
+      //
+      // The event log's gap is real and visible — the reconciliation that
+      // INV-3 asks for is what surfaces it. But the refusal must not be
+      // lost to an exception.
+    }
   }
 
   /**

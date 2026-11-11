@@ -21,7 +21,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { CONTRACTS } from '../packages/contracts/dist/schema-registry.js';
-import { toJsonSchema } from '../packages/contracts/dist/json-schema.js';
+import { exportDocuments } from '../packages/contracts/dist/export.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..');
@@ -43,23 +43,12 @@ const main = (): void => {
       ? resolve(argv[outIndex + 1] as string)
       : DEFAULT_OUT;
 
+  // The documents are built by the **contracts** package, so that the
+  // exporter and `factory doctor`'s `schemas` check compare against the
+  // same bytes. See `packages/contracts/src/export.ts`.
   const documents = new Map<string, string>();
-  for (const entry of CONTRACTS) {
-    const schema = toJsonSchema(entry.schema, { name: `${entry.name}.json` });
-    const document = {
-      $schema: schema['$schema'],
-      $id: schema['$id'],
-      title: entry.name,
-      description: `Contract from pack ${entry.source}.`,
-      ...schema,
-    };
-    // Drop the undefined members the spread may have introduced.
-    for (const key of Object.keys(document)) {
-      if (document[key] === undefined) {
-        delete document[key];
-      }
-    }
-    documents.set(`${entry.name}.json`, `${JSON.stringify(document, null, 2)}\n`);
+  for (const document of exportDocuments()) {
+    documents.set(document.name, document.content);
   }
 
   if (check) {

@@ -98,7 +98,16 @@ export class PostgresRunRecordStore implements RunRecordStore {
    */
   public async find(runId: string): Promise<RunIndexEntry | undefined> {
     const rows = await sql<RunRow>`
-      SELECT * FROM factory.runs WHERE run_id = ${runId}
+      SELECT
+        run_id, task_id, node_id, attempt, role, stage_kind, executor_kind,
+        route, status, outcome, failure_class, started_at, ended_at,
+        record_uri, record_sha256, context_envelope_id, cost_usd_micros,
+        tokens, retention_class,
+        -- The date is read as text, so the value that reaches the
+        -- product is the ISO date the column holds. See the note on the
+        -- PurgeRow type below.
+        retain_until::text AS retain_until
+      FROM factory.runs WHERE run_id = ${runId}
     `.execute(this.#db);
 
     const row = rows.rows[0];
@@ -110,7 +119,10 @@ export class PostgresRunRecordStore implements RunRecordStore {
    */
   public async listPurgeCandidates(asOf: string): Promise<readonly PurgeCandidateRow[]> {
     const rows = await sql<PurgeRow>`
-      SELECT run_id, record_uri, retention_class, retain_until
+      SELECT
+        run_id, record_uri, retention_class,
+        -- The date is read as text — see the note on the PurgeRow type.
+        retain_until::text AS retain_until
       FROM factory.runs
       WHERE retain_until IS NOT NULL
         AND retain_until <= ${asOf}
@@ -123,7 +135,7 @@ export class PostgresRunRecordStore implements RunRecordStore {
       runId: row.run_id,
       recordUri: row.record_uri,
       retentionClass: row.retention_class,
-      retainUntil: row.retain_until === null ? null : String(row.retain_until).slice(0, 10),
+      retainUntil: row.retain_until,
     }));
   }
 
@@ -239,12 +251,29 @@ export class PostgresRunRecordStore implements RunRecordStore {
 
 /**
  * The row type the purge query reads.
+ *
+ * ## Why `retain_until` is a `string` and not a `Date`
+ *
+ * `pg` parses a `date` column (OID 1082) into a **JS `Date`**. The
+ * `Date`'s `toString()` is a *locale-dependent* rendering — `'Wed Nov 10
+ * 2027 00:00:00 GMT+0000 …'` — so slicing its first ten characters
+ * yields `'Wed Nov 10'`, not the ISO date.
+ *
+ * That is not a cosmetic difference. The purge's selection is a
+ * **lexicographic** comparison of ISO dates (`row.retainUntil <= asOf`),
+ * so `'Wed Nov 10'` against `'2027-11-10'` compares `'W'` against `'2'` —
+ * and the record is never due, so **the purge silently never purges
+ * anything**.
+ *
+ * So the column is read as `::text`. The driver hands back the ISO date
+ * the column holds, and the product's date handling is the ISO one it was
+ * written against.
  */
 interface PurgeRow {
   readonly run_id: string;
   readonly record_uri: string | null;
   readonly retention_class: string;
-  readonly retain_until: Date | string | null;
+  readonly retain_until: string | null;
 }
 
 /**
@@ -270,7 +299,7 @@ interface RunRow {
   readonly cost_usd_micros: string | number;
   readonly tokens: unknown;
   readonly retention_class: string;
-  readonly retain_until: Date | string | null;
+  readonly retain_until: string | null;
 }
 
 /**
@@ -298,7 +327,5 @@ const indexFrom = (row: RunRow): RunIndexEntry => ({
   costUsdMicros: Number(row.cost_usd_micros),
   tokens: row.tokens,
   retentionClass: row.retention_class,
-  ...(row.retain_until === null
-    ? {}
-    : { retainUntil: String(row.retain_until).slice(0, 10) }),
+  ...(row.retain_until === null ? {} : { retainUntil: row.retain_until }),
 });

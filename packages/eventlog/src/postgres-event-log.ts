@@ -472,11 +472,54 @@ export class PostgresEventLog implements EventLog {
    * Verify the hash chain of one aggregate.
    *
    * pack 03 §3: `verifyChain(aggregate): Promise<{ ok: boolean; brokenAtSeq?: number }>`.
+   *
+   * The return shape is **exactly** the contract's. The contract's
+   * `ChainVerification` is `.strict()`, and the invariant suite asserts
+   * that shape — so the count cannot be added here without changing the
+   * contract (HR-12).
+   *
+   * For the count, see {@link verifyChainDetailed}.
    */
   public async verifyChain(aggregate: {
     kind: string;
     id: string;
   }): Promise<ChainVerification> {
+    const result = await this.verifyChainDetailed(aggregate);
+    if (result.ok) {
+      return { ok: true };
+    }
+    return {
+      ok: false,
+      ...(result.brokenAtSeq === undefined ? {} : { brokenAtSeq: result.brokenAtSeq }),
+    };
+  }
+
+  /**
+   * Verify the hash chain of one aggregate, and report **how much** was
+   * checked.
+   *
+   * ## Why this is a separate method
+   *
+   * Because "the chain verifies" and "there was nothing to verify" are
+   * different facts, and only the first one is a pass. An aggregate with
+   * **no** events has a trivially intact chain: every link (there are
+   * none) recomputes. Reporting that as "intact" without the count would
+   * let a run that wrote no events look exactly like a run whose events
+   * were all checked.
+   *
+   * That is not hypothetical: the CLI's Postgres verifier reported
+   * `checked: 0` for a run whose log held six events, because the
+   * contract gave it nothing to count. The count could not be added to
+   * `verifyChain` — the contract is `.strict()` and unchanged (HR-12) —
+   * so it lives here, on the concrete class, which is what the CLI calls.
+   *
+   * `verifyChain` remains the **contract** method, and this one is the
+   * richer one; both run the same pure `verifyChainLinks`.
+   */
+  public async verifyChainDetailed(aggregate: {
+    kind: string;
+    id: string;
+  }): Promise<ChainVerification & { readonly checked: number; readonly reason?: string }> {
     const rows = await sql`
       SELECT * FROM factory.events
       WHERE aggregate_kind = ${aggregate.kind} AND aggregate_id = ${aggregate.id}
@@ -492,9 +535,14 @@ export class PostgresEventLog implements EventLog {
 
     const result = verifyChainLinks(links);
     if (result.ok) {
-      return { ok: true };
+      return { ok: true, checked: result.checked };
     }
-    return { ok: false, brokenAtSeq: result.brokenAtSeq };
+    return {
+      ok: false,
+      checked: result.checked,
+      ...(result.brokenAtSeq === undefined ? {} : { brokenAtSeq: result.brokenAtSeq }),
+      ...(result.reason === undefined ? {} : { reason: result.reason }),
+    };
   }
 
   /**

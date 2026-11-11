@@ -35,7 +35,7 @@
  * is proved.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createDatabase,
@@ -45,6 +45,7 @@ import {
 } from '../../../packages/db/src/index.ts';
 import { containerRunning, migrationsDir } from '../../helpers/eventlog.ts';
 import { createPostgres, type Postgres } from '../../helpers/postgres.ts';
+import { PostgresEventLog } from '../../../packages/eventlog/src/index.ts';
 import {
   createAdapter,
   FakeBudgetLedger,
@@ -112,6 +113,51 @@ describe('T-1.10 · the gateway against Postgres', () => {
   let postgres: Postgres;
   let db: Kysely<FactoryDatabase>;
 
+  /**
+   * The task the current test's call is aggregated under.
+   *
+   * **Every test gets its own task id.** The gateway's idempotency key
+   * is `(taskId, nodeId, attempt, promptSha256, modelVersion)`, so two
+   * tests sharing a task id share an idempotency key — and the second
+   * test's call is a *replay*: the provider is never asked, and the
+   * result recorded by the first test (with the first test's provider) is
+   * returned instead.
+   *
+   * The events table is **append-only** by design — no role may UPDATE,
+   * DELETE or TRUNCATE it — so the earlier test's rows cannot be removed
+   * to make room. Distinct task ids give the same isolation without
+   * asking the event log to give up a guarantee it exists to keep.
+   */
+  let taskId = 'task_pg_1';
+
+  /**
+   * The task row the gateway's events are aggregated under.
+   *
+   * The event log's aggregate is the **task**, and the gateway's events
+   * carry `aggregate: {kind: 'task', id: taskId}` — so the task row has
+   * to exist. The row is created directly rather than through the event
+   * log: a task row is the *record* of a task having started, and the
+   * gateway is not the path that starts one.
+   */
+  const insertTask = async (id: string): Promise<void> => {
+    await db
+      .insertInto('tasks')
+      .values({
+        id,
+        repo: 'org/repo',
+        workflow: 'wf_test',
+        state: 'RUNNING',
+        autonomy_level: 1,
+        risk_tier: 'R0',
+        source: { kind: 'manual', ref: 'test', authorLogin: 'tester' },
+        definition_sha: 'a'.repeat(40),
+        correlation_id: id,
+        budget_usd_micros: 1_000_000,
+        created_by: 'tester',
+      })
+      .execute();
+  };
+
   beforeAll(async () => {
     if (!running) {
       return;
@@ -128,29 +174,18 @@ describe('T-1.10 · the gateway against Postgres', () => {
     expect(
       applied.applied.length + applied.alreadyApplied.length,
     ).toBeGreaterThan(0);
-
-    // The event log's aggregate is the **task**, and the gateway's
-    // events carry `aggregate: {kind: 'task', id: taskId}` — so the
-    // task row has to exist. The row is created directly rather than
-    // through the event log: a task row is the *record* of a task
-    // having started, and the gateway is not the path that starts one.
-    await db
-      .insertInto('tasks')
-      .values({
-        id: 'task_pg_1',
-        repo: 'org/repo',
-        workflow: 'wf_test',
-        state: 'RUNNING',
-        autonomy_level: 1,
-        risk_tier: 'R0',
-        source: { kind: 'manual', ref: 'test', authorLogin: 'tester' },
-        definition_sha: 'a'.repeat(40),
-        correlation_id: 'task_pg_1',
-        budget_usd_micros: 1_000_000,
-        created_by: 'tester',
-      })
-      .execute();
   }, 120_000);
+
+  let taskCounter = 0;
+
+  beforeEach(async () => {
+    if (!running) {
+      return;
+    }
+    taskCounter += 1;
+    taskId = `task_pg_${String(taskCounter)}`;
+    await insertTask(taskId);
+  }, 60_000);
 
   afterAll(async () => {
     await db?.destroy();
@@ -185,6 +220,16 @@ describe('T-1.10 · the gateway against Postgres', () => {
 
     const calls = new PostgresModelCallStore({ db });
 
+    // The gateway's own event log.
+    //
+    // `model.requested` reaches the log through the **call store** (the
+    // store appends it in the same transaction as the row), but
+    // `budget.exhausted` is emitted by the gateway itself, through its own
+    // sink. Without a sink the refusal is recorded nowhere — and a budget
+    // refusal that leaves no trace is exactly the failure this suite is
+    // here to catch.
+    const log = new PostgresEventLog({ db });
+
     const gateway = new ModelGatewayImpl({
       policy: POLICY,
       pricing: PRICING,
@@ -196,6 +241,36 @@ describe('T-1.10 · the gateway against Postgres', () => {
           : { perTaskUsdMicros: settings.perTaskUsdMicros }),
       }),
       calls,
+      // The gateway's own event sink.
+      //
+      // `model.requested` reaches the log through the **call store**
+      // (the store appends it in the same transaction as the row), but
+      // `budget.exhausted` is emitted by the gateway itself, through this
+      // separate hook. Without a sink the refusal is recorded nowhere, and
+      // a budget refusal that leaves no trace is exactly the failure this
+      // suite is here to catch.
+      events: {
+        append: async (event): Promise<void> => {
+          await log.append([
+            {
+              eventType: event.eventType,
+              // A budget refusal is a property of the **task**: it is the
+              // task's budget that was exhausted, and the task is the
+              // aggregate the event log versions and chains.
+              aggregate: { kind: 'task', id: taskId, version: 0 },
+              correlationId: taskId,
+              actor: { kind: 'system', id: 'gateway' },
+              authority: { basis: 'system-rule' },
+              context: { items: [] },
+              subject: {},
+              payload: event.payload,
+              // The refusal does not change the task's state — it stops
+              // the task, and the caller records that separately.
+              bumpsVersion: false,
+            },
+          ]);
+        },
+      },
       clock: {
         now: (): Date => new Date('2026-11-10T00:00:00.000Z'),
         nowIso: (): string => '2026-11-10T00:00:00.000Z',
@@ -219,7 +294,7 @@ describe('T-1.10 · the gateway against Postgres', () => {
   ): Parameters<ModelGatewayImpl['complete']>[0] =>
     ({
       role: 'worker',
-      taskId: 'task_pg_1',
+      taskId,
       nodeId: 'node_1',
       attempt: 1,
       messages: [{ role: 'user', content: 'hello' }],
@@ -236,13 +311,18 @@ describe('T-1.10 · the gateway against Postgres', () => {
     const rows = await db
       .selectFrom('model_calls')
       .selectAll()
-      .where('task_id', '=', 'task_pg_1')
+      .where('task_id', '=', taskId)
       .execute();
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.provider).toBe('alpha');
     expect(rows[0]?.model).toBe('test-model-small');
-    expect(rows[0]?.cost_usd_micros).toBe(600);
+    // The column is `bigint` (the pack's DDL is normative), and `pg`
+    // returns a `bigint` as a **string** to avoid the precision loss that
+    // a JS number would cause. The store converts it on the way out — so
+    // the assertion converts it the same way, rather than asserting a
+    // driver detail the product does not depend on.
+    expect(Number(rows[0]?.cost_usd_micros)).toBe(600);
   });
 
   it.skipIf(!running)('writes the event with the RIGHT type', async () => {
@@ -254,11 +334,12 @@ describe('T-1.10 · the gateway against Postgres', () => {
       .selectFrom('events')
       .selectAll()
       .where('event_type', '=', 'model.requested')
+      .where('aggregate_id', '=', taskId)
       .execute();
 
     expect(events).toHaveLength(1);
     expect(events[0]?.aggregate_kind).toBe('task');
-    expect(events[0]?.aggregate_id).toBe('task_pg_1');
+    expect(events[0]?.aggregate_id).toBe(taskId);
   });
 
   it.skipIf(!running)('the idempotency key is REALLY unique', async () => {
@@ -275,7 +356,7 @@ describe('T-1.10 · the gateway against Postgres', () => {
         await db
           .selectFrom('model_calls')
           .select('idempotency_key')
-          .where('task_id', '=', 'task_pg_1')
+          .where('task_id', '=', taskId)
           .execute()
       )[0]?.idempotency_key ?? '',
     );
@@ -287,7 +368,7 @@ describe('T-1.10 · the gateway against Postgres', () => {
         .insertInto('model_calls')
         .values({
           id: 'mcl_pg_duplicate',
-          task_id: 'task_pg_1',
+          task_id: taskId,
           provider: 'alpha',
           model: 'test-model-small',
           cost_usd_micros: 0,
@@ -316,7 +397,7 @@ describe('T-1.10 · the gateway against Postgres', () => {
     const rows = await db
       .selectFrom('model_calls')
       .selectAll()
-      .where('task_id', '=', 'task_pg_1')
+      .where('task_id', '=', taskId)
       .execute();
     expect(rows).toHaveLength(1);
   });
@@ -334,7 +415,7 @@ describe('T-1.10 · the gateway against Postgres', () => {
     const rows = await db
       .selectFrom('model_calls')
       .selectAll()
-      .where('task_id', '=', 'task_pg_1')
+      .where('task_id', '=', taskId)
       .execute();
 
     expect(rows).toHaveLength(1);
@@ -351,7 +432,7 @@ describe('T-1.10 · the gateway against Postgres', () => {
     const rows = await db
       .selectFrom('model_calls')
       .selectAll()
-      .where('task_id', '=', 'task_pg_1')
+      .where('task_id', '=', taskId)
       .execute();
     expect(rows).toHaveLength(0);
 
@@ -359,6 +440,7 @@ describe('T-1.10 · the gateway against Postgres', () => {
       .selectFrom('events')
       .selectAll()
       .where('event_type', '=', 'budget.exhausted')
+      .where('aggregate_id', '=', taskId)
       .execute();
     expect(events).toHaveLength(1);
   });

@@ -26,7 +26,7 @@
  * limit, not a failure of the code, and CI is where it is proved.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createDatabase,
@@ -159,7 +159,12 @@ describe('T-1.07 · the scheduler against Postgres', () => {
       return;
     }
     postgres = await createPostgres('factory_t1_07_scheduler');
-    const applied = await postgres.psql(SCHEMA);
+    // Applied **as the owner**, not as the superuser. The scheduler connects
+    // as `factory_owner`, so the tables have to be owned by that role —
+    // a table created by the superuser is invisible to it (the role has no
+    // privileges on it), and the failure reads as
+    // `relation "tasks" does not exist`.
+    const applied = await postgres.psqlAsOwner(SCHEMA);
     expect(isError(applied)).toBe(false);
 
     // The scheduler writes as the owner role: it leases jobs and commits
@@ -171,6 +176,30 @@ describe('T-1.07 · the scheduler against Postgres', () => {
       mode: 'assume',
     });
   }, 120_000);
+
+  /**
+   * Every test starts from an empty queue.
+   *
+   * The suite shares one database, so without this a job leased by one test
+   * is still leased when the next test runs. The cap assertions then read
+   * the *shared* count rather than the count the test set up: a test that
+   * enqueues one job and expects one winner sees two, and a test that
+   * expects "the global cap of one is reached" sees it already reached
+   * before it enqueues anything.
+   *
+   * Those failures look like scheduler defects and are not — the cap is
+   * working correctly against a queue the earlier test left behind. Each
+   * test's assertion is only meaningful against the state it created, so
+   * the state is reset between them.
+   */
+  beforeEach(async () => {
+    if (!running) {
+      return;
+    }
+    await db.deleteFrom('jobs').execute();
+    await db.deleteFrom('nodes').execute();
+    await db.deleteFrom('tasks').execute();
+  }, 60_000);
 
   afterAll(async () => {
     await db?.destroy();

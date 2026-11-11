@@ -37,6 +37,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   InMemoryChainVerifier,
+  PostgresChainVerifier,
   buildLinks,
   runAuditChain,
   verdictLines,
@@ -266,6 +267,73 @@ describe('factory audit chain', () => {
       verify: () => Promise.resolve(verdict),
     });
     expect(result.lines.join('\n')).toContain('hash mismatch');
+  });
+
+  it('exits 1 on an EMPTY chain — an audit of nothing is not a pass', async () => {
+    // An aggregate with no events has a **trivially intact** chain:
+    // every link (there are none) recomputes. So `verifyChainLinks`
+    // says `ok: true`, and a verdict that reported that as a pass would
+    // make a run that wrote no events look exactly like a run whose
+    // events were all verified.
+    //
+    // This is the failure the CLI found for real: the Postgres verifier
+    // reported `checked: 0` while the log held six events, so the
+    // command said "intact (0 links checked)" — a pass on nothing.
+    const verdict: ChainVerdict = { ok: true, checked: 0 };
+    const result = await runAuditChain('task-with-no-events', {
+      verify: () => Promise.resolve(verdict),
+    });
+    expect(result.exitCode).toBe(1);
+  });
+
+  it('says NOTHING TO VERIFY on an empty chain', async () => {
+    const verdict: ChainVerdict = { ok: true, checked: 0 };
+    const result = await runAuditChain('task-with-no-events', {
+      verify: () => Promise.resolve(verdict),
+    });
+    expect(result.lines.join('\n')).toContain('NOTHING TO VERIFY');
+    expect(result.lines.join('\n')).toContain('no events');
+  });
+
+  it('does not report an empty chain as intact', async () => {
+    // The word "intact" must not appear for an empty chain — a script
+    // that greps for it would otherwise read a false pass.
+    const verdict: ChainVerdict = { ok: true, checked: 0 };
+    const result = await runAuditChain('task-with-no-events', {
+      verify: () => Promise.resolve(verdict),
+    });
+    expect(result.lines.join('\n')).not.toContain('intact');
+  });
+});
+
+describe('the Postgres verifier', () => {
+  it('reports how many links the log actually checked', async () => {
+    // The bug this covers: the adapter hard-coded `checked: 0`, so the
+    // command printed "intact (0 links checked)" while the log held six
+    // events. The count comes from the log's own verifier.
+    const verifier = new PostgresChainVerifier({
+      verifyChainDetailed: () =>
+        Promise.resolve({ ok: true, checked: 6 }),
+    });
+    const verdict = await verifier.verify({ kind: 'task', id: 'task-1' });
+    expect(verdict.checked).toBe(6);
+    expect(verdict.ok).toBe(true);
+  });
+
+  it('carries the reason the log gave', async () => {
+    const verifier = new PostgresChainVerifier({
+      verifyChainDetailed: () =>
+        Promise.resolve({
+          ok: false,
+          checked: 6,
+          brokenAtSeq: 3,
+          reason: 'hash mismatch at seq 3',
+        }),
+    });
+    const verdict = await verifier.verify({ kind: 'task', id: 'task-1' });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.brokenAtSeq).toBe(3);
+    expect(verdict.checked).toBe(6);
   });
 });
 

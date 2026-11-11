@@ -49,6 +49,21 @@ export class InMemoryInvocationStore implements InvocationStore {
    * implementation they share a transaction; here there is no transaction,
    * so the store writes them in one synchronous step and a failure between
    * them is not expressible.
+   *
+   * A **duplicate idempotency key updates the row**. The Postgres table
+   * declares `idempotency_key text NOT NULL UNIQUE` and the store writes
+   * it with `ON CONFLICT … DO UPDATE`, so the second write of a key
+   * **replaces** the row's status, result and duration. This double does
+   * the same — a double that refused the second write would diverge from
+   * the real implementation, and the divergence is not cosmetic: a
+   * failed attempt is followed by a retry of the **same** attempt (the
+   * key includes the attempt number, and the number has not changed), so
+   * refusing the second write would mean the successful attempt was
+   * **never recorded**.
+   *
+   * The first write's *event* is kept in the event list; the retry
+   * appends its own. The row is the record of the latest attempt, and the
+   * log is the record of what happened — both of them, in order.
    */
   public record(record: InvocationRecord, event: BrokerEvent): Promise<void> {
     this.#records.push(record);

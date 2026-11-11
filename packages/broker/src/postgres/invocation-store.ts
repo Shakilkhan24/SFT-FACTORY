@@ -16,10 +16,26 @@
  * ## The idempotency key is a unique index
  *
  * The replay oracle is enforced by the **database**, not by the broker:
- * `tool_invocations.idempotency_key` is unique, so a second invocation
- * with the same key cannot be written. That is what makes the replay
- * *provable* against a real database rather than only against the
- * in-memory double.
+ * `tool_invocations.idempotency_key` is unique, so there is at most one
+ * row per key and the row's status is the authoritative record of what
+ * that key produced.
+ *
+ * A **retry** of the same attempt writes the **same** key — the key is
+ * `(taskId, nodeId, attempt, capabilityId, argsSha256)`, and the attempt
+ * number has not changed — so the write is an **upsert**: the row's
+ * status, result and duration become the latest attempt's. That matters,
+ * because a failed attempt is followed by a retry of the same attempt
+ * (pack 02 §4.8: "nodes with expired leases are re-queued"), and the row
+ * must record the attempt that actually succeeded.
+ *
+ * The replay protection itself is the broker's: it consults
+ * `findByKey` and replays a **succeeded** record rather than executing
+ * again. A failed record is not replayed — a retry must try again.
+ *
+ * This behaviour was found by the INV-12 contract suite: the in-memory
+ * double used to overwrite silently while the Postgres store rejected the
+ * second write outright, so a test written against the double passed and
+ * the real implementation lost the succeeded invocation.
  */
 
 import type { NewEvent } from '@factory/contracts';
@@ -141,6 +157,13 @@ export class PostgresInvocationStore implements InvocationStore {
         ${record.durationMs},
         ${record.costUsdMicros}
       )
+      ON CONFLICT (idempotency_key) DO UPDATE SET
+        status = EXCLUDED.status,
+        result_summary = EXCLUDED.result_summary,
+        duration_ms = EXCLUDED.duration_ms,
+        cost_usd_micros = EXCLUDED.cost_usd_micros,
+        policy_decision_id = EXCLUDED.policy_decision_id,
+        approval_id = EXCLUDED.approval_id
     `.execute(trx);
   }
 
@@ -190,7 +213,17 @@ interface InvocationRow {
   readonly status: string;
   readonly idempotency_key: string;
   readonly duration_ms: number | null;
-  readonly cost_usd_micros: number | null;
+  /**
+   * The cost, in micro-dollars.
+   *
+   * The column is `bigint`, and the `pg` driver hands a `bigint` back as a
+   * **string** — because a 64-bit integer does not fit in a JavaScript
+   * number for every value. The column is a cost in micro-dollars, so the
+   * value is far inside the safe range, and the record's field is a
+   * `number`. The conversion happens here, in the row reader, so that every
+   * caller sees the same type the in-memory store hands out.
+   */
+  readonly cost_usd_micros: string | number | null;
   readonly started_at: Date;
 }
 
@@ -220,6 +253,26 @@ const recordFrom = (row: InvocationRow): InvocationRecord => ({
   status: row.status as InvocationRecord['status'],
   idempotencyKey: row.idempotency_key,
   durationMs: row.duration_ms ?? 0,
-  costUsdMicros: row.cost_usd_micros ?? 0,
+  costUsdMicros: toMicros(row.cost_usd_micros),
   actor: { kind: 'system', id: 'factory' },
 });
+
+/**
+ * The cost in micro-dollars, as a number.
+ *
+ * The column is a `bigint`, so the driver hands it back as a string. The
+ * record's field is a number — a caller that adds two costs must not get
+ * a string concatenation, and the in-memory store hands out a number, so
+ * the two stores must agree on the type.
+ *
+ * A value that is not a number at all is **zero**, not `NaN`: a
+ * `NaN` would poison every total it entered, whereas a zero is a cost
+ * the factory has not recorded yet.
+ */
+const toMicros = (value: string | number | null): number => {
+  if (value === null) {
+    return 0;
+  }
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};

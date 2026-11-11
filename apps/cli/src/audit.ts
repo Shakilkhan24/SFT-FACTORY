@@ -185,7 +185,9 @@ export const verdictLines = (
   lines.push(
     verdict.ok
       ? `chain: intact (${String(verdict.checked)} links checked)`
-      : `chain: BROKEN at seq ${String(verdict.brokenAtSeq ?? '?')}`,
+      : verdict.brokenAtSeq === undefined
+        ? 'chain: NOTHING TO VERIFY'
+        : `chain: BROKEN at seq ${String(verdict.brokenAtSeq)}`,
   );
   lines.push(`  aggregate: ${aggregate.kind}:${aggregate.id}`);
   lines.push(`  links:     ${String(verdict.checked)}`);
@@ -198,24 +200,26 @@ export const verdictLines = (
 /**
  * The verifier backed by the real log.
  *
- * It wraps `PostgresEventLog.verifyChain` — which is a SELECT followed by
- * a call to the same pure `verifyChainLinks` the in-memory verifier uses.
- * So the two implementations differ only in **where the links come
- * from**, not in how a break is detected.
+ * It wraps `PostgresEventLog.verifyChainDetailed` — which is a SELECT
+ * followed by a call to the same pure `verifyChainLinks` the in-memory
+ * verifier uses. So the two implementations differ only in **where the
+ * links come from**, not in how a break is detected.
  *
- * ## The shape is adapted
+ * ## Why the **detailed** method
  *
- * `contracts`' `ChainVerification` carries `ok` and `brokenAtSeq`; the
- * CLI's `ChainVerdict` also carries the count and the reason. The
- * adapter fills in what the contract does not have — the count is
- * unknown here, and the reason is stated in the CLI's own words — so
- * the CLI prints one shape regardless of which verifier it used.
+ * Because the count matters. `contracts`' `ChainVerification` carries
+ * `ok` and `brokenAtSeq` and is `.strict()` — the contract is unchanged
+ * (HR-12) — so the count cannot ride on `verifyChain`. It comes from
+ * the concrete class's `verifyChainDetailed`, which runs the same pure
+ * verifier and additionally reports how many links it checked.
  */
 export class PostgresChainVerifier implements ChainVerifier {
   private readonly log: {
-    verifyChain(aggregate: { kind: string; id: string }): Promise<{
+    verifyChainDetailed(aggregate: { kind: string; id: string }): Promise<{
       readonly ok: boolean;
       readonly brokenAtSeq?: number | undefined;
+      readonly checked?: number | undefined;
+      readonly reason?: string | undefined;
     }>;
   };
 
@@ -224,9 +228,11 @@ export class PostgresChainVerifier implements ChainVerifier {
    */
   constructor(
     log: {
-      verifyChain(aggregate: { kind: string; id: string }): Promise<{
+      verifyChainDetailed(aggregate: { kind: string; id: string }): Promise<{
         readonly ok: boolean;
         readonly brokenAtSeq?: number | undefined;
+        readonly checked?: number | undefined;
+        readonly reason?: string | undefined;
       }>;
     },
   ) {
@@ -240,10 +246,14 @@ export class PostgresChainVerifier implements ChainVerifier {
     readonly kind: string;
     readonly id: string;
   }): Promise<ChainVerdict> {
-    const result = await this.log.verifyChain({ kind: aggregate.kind, id: aggregate.id });
+    const result = await this.log.verifyChainDetailed({
+      kind: aggregate.kind,
+      id: aggregate.id,
+    });
+    const checked = result.checked ?? 0;
     return {
       ok: result.ok,
-      checked: 0,
+      checked,
       ...(result.brokenAtSeq === undefined ? {} : { brokenAtSeq: result.brokenAtSeq }),
       ...(result.ok
         ? {}
@@ -256,6 +266,23 @@ export class PostgresChainVerifier implements ChainVerifier {
     };
   }
 }
+
+/**
+ * The reason an **empty** chain is not a pass.
+ *
+ * An aggregate with no events has a trivially intact chain: every link
+ * (there are none) recomputes. So `verifyChainLinks` says `ok: true` for
+ * a chain with nothing in it — which is correct as a *statement about
+ * the links* and wrong as an *audit verdict*.
+ *
+ * The audit's question is "was this run's history verified?", and the
+ * answer for a run that wrote no events is **no**. So the empty case is
+ * reported as a failure with its own reason, distinct from a broken
+ * chain — an operator reading the output can tell "there was nothing to
+ * verify" from "the history was tampered with".
+ */
+export const EMPTY_CHAIN_REASON =
+  'the aggregate has no events, so there was no chain to verify';
 
 /**
  * Run `factory audit chain <taskId>`.
@@ -277,10 +304,23 @@ export const runAuditChain = async (
   const aggregate = { kind: 'task', id: taskId };
   const verdict = await verifier.verify(aggregate);
 
+  // An **empty** chain is not a pass. The links verify trivially (there
+  // are none), so `verdict.ok` is true — but "there was nothing to
+  // verify" is not "the history was verified", and an audit that cannot
+  // tell the two apart is worse than no audit.
+  const empty = verdict.checked === 0;
+  const reported: ChainVerdict = empty
+    ? {
+        ok: false,
+        checked: 0,
+        reason: EMPTY_CHAIN_REASON,
+      }
+    : verdict;
+
   return {
-    lines: verdictLines(aggregate, verdict),
+    lines: verdictLines(aggregate, reported),
     // 0 for an intact chain, 1 for a broken one. Not 2 — 2 means the
     // command was invoked wrongly, and a tampered chain is not that.
-    exitCode: verdict.ok ? 0 : 1,
+    exitCode: reported.ok ? 0 : 1,
   };
 };

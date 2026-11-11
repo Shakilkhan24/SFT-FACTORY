@@ -173,10 +173,10 @@ export class PostgresJobQueue implements JobQueue {
       const insertedId = inserted.rows[0]?.id;
 
       const row = await sql<JobRow>`
-        SELECT id, task_id, node_id, t.workflow, kind, status, priority,
-               available_at::text AS available_at,
-               lease_owner, lease_expires_at::text AS lease_expires_at,
-               attempt, max_attempts, idempotency_key
+        SELECT j.id, j.task_id, j.node_id, t.workflow, j.kind, j.status, j.priority,
+               j.available_at::text AS available_at,
+               j.lease_owner, j.lease_expires_at::text AS lease_expires_at,
+               j.attempt, j.max_attempts, j.idempotency_key
         FROM factory.jobs j
         JOIN factory.tasks t ON t.id = j.task_id
         WHERE j.idempotency_key = ${job.idempotencyKey}
@@ -568,12 +568,38 @@ export class PostgresJobQueue implements JobQueue {
       `.execute(trx);
 
       if (input.nodeId !== null) {
+        // `winnerRunId` is written **here**, on the same statement that
+        // commits the result.
+        //
+        // The duplicate check above reads the winner back out of
+        // `spec->>'winnerRunId'`. If this statement did not write it, that
+        // read would always find nothing, the second worker to report the
+        // same node would find no committed result, and **both** results
+        // would be applied — which is exactly the "the first committed
+        // result wins" rule failing. The write and the read are two halves
+        // of one mechanism, so they have to be changed together.
+        //
+        // The statement **upserts**. A plain `UPDATE` matches nothing when
+        // the node row has not been created yet, and then the winner is
+        // recorded nowhere — the same failure, by a quieter route. The
+        // node row is this mechanism's only durable record of which run
+        // won, so committing a result has to be able to create it.
         await sql`
-          UPDATE factory.nodes
-          SET state = ${input.outcome === 'succeeded' ? 'SUCCEEDED' : 'FAILED'},
-              result = ${JSON.stringify(input.result ?? null)}::jsonb,
-              version = version + 1
-          WHERE task_id = ${input.taskId} AND node_id = ${input.nodeId}
+          INSERT INTO factory.nodes (task_id, node_id, kind, state, spec, result, version)
+          VALUES (
+            ${input.taskId},
+            ${input.nodeId},
+            ${row.kind},
+            ${input.outcome === 'succeeded' ? 'SUCCEEDED' : 'FAILED'},
+            jsonb_build_object('winnerRunId', ${input.runId}::text),
+            ${JSON.stringify(input.result ?? null)}::jsonb,
+            1
+          )
+          ON CONFLICT (task_id, node_id) DO UPDATE
+          SET state = EXCLUDED.state,
+              result = EXCLUDED.result,
+              spec = COALESCE(factory.nodes.spec, '{}'::jsonb) || EXCLUDED.spec,
+              version = factory.nodes.version + 1
         `.execute(trx);
       }
 

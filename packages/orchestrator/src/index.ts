@@ -195,3 +195,44 @@ export {
   FakeEnvironmentRegistry,
   FakeStateSink,
 } from './runtime/fakes/fake-reclaimers.js';
+
+/* -------------------------------------------------------------------------- */
+/* The `H.hello` workflow (checklist 03, T-1.17)                             */
+/* -------------------------------------------------------------------------- */
+
+export {
+  ARTEFACT_STAGE,
+  HELLO_STAGES,
+  HELLO_WORKFLOW_ID,
+  HELLO_WORKFLOW_VERSION,
+  RECORD_STAGE,
+  SPECIFICATION_STAGE,
+  helloStage,
+  type HelloStage,
+} from './hello/workflow.js';
+
+export {
+  COMPLETION_FAILURE_CLASSES,
+  CompletionExecutor,
+  type ArtefactDigest,
+  type ArtefactSink,
+  type CompletionExecutorOptions,
+} from './hello/completion-executor.js';
+
+export {
+  RecordExecutor,
+  type RecordExecutorOptions,
+  type RecordSink,
+} from './hello/record-executor.js';
+
+export {
+  RunObservations,
+  type HelloContext,
+  type NodeObservation,
+} from './hello/observations.js';
+
+export {
+  runHello,
+  type HelloRunOptions,
+  type HelloRunOutcome,
+} from './hello/run.js';

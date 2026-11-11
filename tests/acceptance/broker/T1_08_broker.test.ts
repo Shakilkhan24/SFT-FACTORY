@@ -32,7 +32,7 @@
  * limit, not a failure of the code, and CI is where it is proved.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createDatabase,
@@ -72,6 +72,17 @@ import {
 const running = await containerRunning();
 
 /**
+ * The counter that names the invocation ids.
+ *
+ * The invocation row's `id` is its **primary key**, so two brokers built
+ * against the same database must not mint the same one. The counter is
+ * bumped once per test, and the id prefix carries it — so the ids are
+ * unique across the suite without the rows ever being deleted (the event
+ * log they belong to is append-only by design).
+ */
+let idCounter = 0;
+
+/**
  * The broker, wired to the Postgres store.
  *
  * The doubles are the same ones the unit suite uses — only the **store**
@@ -81,6 +92,15 @@ const buildBroker = (options: {
   readonly db: Kysely<FactoryDatabase>;
   readonly store?: PostgresInvocationStore;
   readonly handler?: () => unknown;
+  /**
+   * The prefix for the invocation ids.
+   *
+   * The id is the row's **primary key**, so two brokers built in the same
+   * database must not mint the same one. The default prefix is shared
+   * across the whole suite, so a caller that shares the database gives
+   * each case its own.
+   */
+  readonly idPrefix?: string;
 }) => {
   const store = options.store ?? new PostgresInvocationStore({ db: options.db });
 
@@ -132,26 +152,50 @@ const buildBroker = (options: {
     credentials: new RecordingCredentialProvider(),
     store,
     clock: new FixedBrokerClock(),
-    ids: new CountingIdSource(),
+    ids: new CountingIdSource(options.idPrefix ?? `inv_pg_${String(idCounter)}`),
   });
 
   return { broker, store };
 };
 
-/**
- * A request.
- */
-const aRequest = (overrides: Partial<InvocationRequest> = {}): InvocationRequest => ({
-  capabilityId: 'test.capability',
-  args: { repo: 'org/repo' },
-  context: aContext(),
-  grant: aGrant(),
-  ...overrides,
-});
-
 describe('T-1.08 · the broker against Postgres', () => {
   let postgres: Postgres;
   let db: Kysely<FactoryDatabase>;
+
+  /**
+   * The task the current test's invocation belongs to.
+   *
+   * **Every test gets its own task id.** The broker's idempotency key is
+   * `(taskId, nodeId, attempt, capabilityId, argsSha256)` — so two tests
+   * sharing a task id share an idempotency key, and the second test's call
+   * is a *replay*: the capability is never executed, and the result
+   * recorded by the first test (with the first test's adapter) is returned
+   * instead.
+   *
+   * That is not a hypothetical: it is exactly what the replay test
+   * asserts, and without per-test isolation it fires against the *previous*
+   * test's row. The suite would then measure the previous test's state and
+   * report it as this test's failure.
+   *
+   * The rows cannot simply be deleted between tests — `factory.events` is
+   * append-only by design (no role may UPDATE, DELETE or TRUNCATE it), and
+   * the invocation's event is part of that log. Distinct task ids give the
+   * same isolation without asking the event log to give up a guarantee it
+   * exists to keep.
+   */
+  let taskId = 'task_1';
+
+  /**
+   * The run the current test's invocation belongs to.
+   *
+   * `tool_invocations.run_id` references `runs(run_id)`, and
+   * `runs.task_id` references `tasks(id)` — so the invocation's run has
+   * to exist before the invocation can be written. The rows are created
+   * directly rather than through the event log: a task row is the
+   * *record* of a task having started, and the broker is not the path
+   * that starts one.
+   */
+  let runId = 'run_1';
 
   beforeAll(async () => {
     if (!running) {
@@ -166,17 +210,23 @@ describe('T-1.08 · the broker against Postgres', () => {
     });
     const applied = await migrate(db, migrationsDir);
     expect(applied.applied.length + applied.alreadyApplied.length).toBeGreaterThan(0);
+  }, 120_000);
 
-    // `tool_invocations.run_id` references `runs(run_id)`, and
-    // `runs.task_id` references `tasks(id)` — so the invocation's run has
-    // to exist before the invocation can be written. The rows are created
-    // directly rather than through the event log: a run row is the
-    // *record* of a run having started, and the broker is not the path
-    // that starts one.
+  let taskCounter = 0;
+
+  beforeEach(async () => {
+    if (!running) {
+      return;
+    }
+    taskCounter += 1;
+    idCounter += 1;
+    taskId = `task_${String(taskCounter)}`;
+    runId = `run_${String(taskCounter)}`;
+
     await db
       .insertInto('tasks')
       .values({
-        id: 'task_1',
+        id: taskId,
         repo: 'org/repo',
         workflow: 'wf_test',
         state: 'RUNNING',
@@ -184,7 +234,7 @@ describe('T-1.08 · the broker against Postgres', () => {
         risk_tier: 'R0',
         source: { kind: 'manual', ref: 'test', authorLogin: 'tester' },
         definition_sha: 'a'.repeat(40),
-        correlation_id: 'task_1',
+        correlation_id: taskId,
         budget_usd_micros: 1_000_000,
         created_by: 'tester',
       })
@@ -193,8 +243,8 @@ describe('T-1.08 · the broker against Postgres', () => {
     await db
       .insertInto('runs')
       .values({
-        run_id: 'run_1',
-        task_id: 'task_1',
+        run_id: runId,
+        task_id: taskId,
         node_id: 'node_1',
         attempt: 1,
         role: 'implementer',
@@ -203,7 +253,7 @@ describe('T-1.08 · the broker against Postgres', () => {
         status: 'RUNNING',
       })
       .execute();
-  }, 120_000);
+  }, 60_000);
 
   afterAll(async () => {
     if (db !== undefined) {
@@ -213,7 +263,24 @@ describe('T-1.08 · the broker against Postgres', () => {
   }, 60_000);
 
   /**
-   * The invocation rows.
+   * A request.
+   *
+   * The context carries the **current test's** task and run, so the
+   * idempotency key differs per test (see `taskId` above).
+   */
+  const aRequest = (overrides: Partial<InvocationRequest> = {}): InvocationRequest => ({
+    capabilityId: 'test.capability',
+    args: { repo: 'org/repo' },
+    context: aContext({ taskId, runId }),
+    grant: aGrant(),
+    ...overrides,
+  });
+
+  /**
+   * The invocation rows for the current test.
+   *
+   * Scoped to `task_id` — the suite shares one database, so without the
+   * scope a test would count the rows the earlier tests left behind.
    */
   const invocationRows = async (): Promise<
     readonly {
@@ -235,19 +302,25 @@ describe('T-1.08 · the broker against Postgres', () => {
     }>`
       SELECT id, capability_id, status, idempotency_key, result_summary, args_sha256
       FROM factory.tool_invocations
+      WHERE task_id = ${taskId}
       ORDER BY started_at, id
     `.execute(db);
     return rows.rows;
   };
 
   /**
-   * The event log's rows.
+   * The event log's rows for the current test.
+   *
+   * Scoped to `aggregate_id` — the broker's events are aggregated under
+   * the task.
    */
   const eventRows = async (): Promise<
     readonly { readonly event_type: string; readonly aggregate_kind: string }[]
   > => {
     const rows = await sql<{ event_type: string; aggregate_kind: string }>`
-      SELECT event_type, aggregate_kind FROM factory.events ORDER BY seq
+      SELECT event_type, aggregate_kind FROM factory.events
+      WHERE aggregate_id = ${taskId}
+      ORDER BY seq
     `.execute(db);
     return rows.rows;
   };
@@ -274,9 +347,13 @@ describe('T-1.08 · the broker against Postgres', () => {
     // failure *between* them leaves neither — the event log can never claim
     // a call the table does not record.
     //
-    // The failure is injected by making the event append fail: the store
-    // inserts the row first, then appends the event, and the append is what
-    // breaks.
+    // The failure is injected at the **store boundary**: the store refuses
+    // to write anything at all. The real store writes the row and the
+    // event in one transaction, so a failure on either side of the
+    // transaction leaves neither — and this double proves the *contract*
+    // the broker relies on: `invoke` returns an outcome, never an
+    // exception, and a call that could not be recorded is a **refusal**,
+    // not a crash.
     const store = new PostgresInvocationStore({ db });
     const failing = {
       record: (): Promise<void> => {
@@ -290,6 +367,12 @@ describe('T-1.08 · the broker against Postgres', () => {
     const outcome = await broker.invoke(aRequest());
 
     expect(outcome.ok).toBe(false);
+    // The refusal names the step that could not complete: step 10, the
+    // invocation record. A caller that sees "the capability could not be
+    // executed" would look for the adapter; the reason must point at the
+    // write instead.
+    expect(outcome.ok === false && outcome.failedAt).toBe('record');
+    expect(outcome.ok === false && outcome.failureClass).toBe('tool.unavailable');
     // Neither the row nor the event was written — the transaction rolled
     // back as a whole.
     expect(await invocationRows()).toHaveLength(0);

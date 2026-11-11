@@ -146,12 +146,28 @@ export class FixedBrokerClock implements BrokerClock {
 
 /**
  * An id source that counts.
+ *
+ * ## Why the prefix is configurable
+ *
+ * The ids are the invocation rows' **primary key**. A suite that shares
+ * one database across several tests cannot let two of them mint the same
+ * id — the second write fails on `tool_invocations_pkey`, and the failure
+ * reads as a broker defect when it is a test-isolation defect.
+ *
+ * So the prefix is the caller's: a test that shares a database gives each
+ * case its own, and the ids stay unique across the suite.
  */
 export class CountingIdSource implements BrokerIdSource {
   #next = 1;
 
+  readonly #prefix: string;
+
+  public constructor(prefix = 'inv_test') {
+    this.#prefix = prefix;
+  }
+
   public next(): string {
-    const id = `inv_test_${String(this.#next).padStart(4, '0')}`;
+    const id = `${this.#prefix}_${String(this.#next).padStart(4, '0')}`;
     this.#next += 1;
     return id;
   }

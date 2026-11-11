@@ -10,7 +10,7 @@
  * schema that no longer matches the repository.
  */
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -25,10 +25,32 @@ import {
   type FactoryDatabase,
   type Kysely,
 } from '../../packages/db/src/index.ts';
+// The CLI's `run` is imported **statically**, not with a dynamic
+// `import()` inside each test. The dynamic form put the module-graph
+// load *inside* the test's 5 s timeout budget, and under load — 13
+// invariant files in parallel, with the Docker-backed suites running —
+// the first test to touch it timed out. The test itself is trivial
+// (`run(['db'], {})`); the load was the cost.
+import { run } from '../../apps/cli/src/index.ts';
 import { createPostgres, type Postgres } from '../helpers/postgres.ts';
 
 const repoRoot = resolve(import.meta.dirname, '..', '..');
 const migrationsDir = join(repoRoot, 'migrations');
+
+/**
+ * The migration files on disk, in order.
+ *
+ * The assertions below read the *directory* rather than a list written out
+ * in the test. A hard-coded list is a snapshot of the directory at the
+ * moment the test was written, so every later migration breaks it — and
+ * the break looks like a defect in the runner rather than a stale
+ * expectation. Reading the directory means the test still says what it
+ * means: "the runner applied **every** migration, and only those".
+ */
+const migrationFiles = (): string[] =>
+  readdirSync(migrationsDir)
+    .filter((name) => name.endsWith('.sql'))
+    .sort();
 
 describe('T-1.02 · the migration runner', () => {
   let pg: Postgres;
@@ -51,19 +73,21 @@ describe('T-1.02 · the migration runner', () => {
 
   it('A1.12 applies every pending migration', async () => {
     const result = await migrate(db, migrationsDir);
-    expect(result.applied).toEqual(['0001_core.sql', '0001_grants.sql']);
+    expect(result.applied).toEqual(migrationFiles());
     expect(result.alreadyApplied).toEqual([]);
   }, 120_000);
 
   it('A1.12 a second run applies nothing', async () => {
     const result = await migrate(db, migrationsDir);
     expect(result.applied).toEqual([]);
-    expect(result.alreadyApplied).toEqual(['0001_core.sql', '0001_grants.sql']);
+    expect(result.alreadyApplied).toEqual(migrationFiles());
   }, 60_000);
 
   it('A1.12 status reports every migration as applied', async () => {
     const rows = await status(db, migrationsDir);
-    expect(rows.map((row) => row.state)).toEqual(['applied', 'applied']);
+    expect(rows.map((row) => row.state)).toEqual(
+      migrationFiles().map(() => 'applied'),
+    );
     for (const row of rows) {
       expect(row.appliedAt).not.toBeNull();
     }
@@ -161,21 +185,18 @@ describe('T-1.02 · the migration runner', () => {
 
 describe('T-1.02 · the CLI', () => {
   it('A1.13 `factory db` with no subcommand explains itself', async () => {
-    const { run } = await import('../../apps/cli/src/index.ts');
     const result = await run(['db'], {});
     expect(result.exitCode).toBe(2);
     expect(result.lines.join('\n')).toContain('factory db migrate | status | partitions');
   });
 
   it('A1.13 `factory db status` without a connection string says so', async () => {
-    const { run } = await import('../../apps/cli/src/index.ts');
     const result = await run(['db', 'status'], {});
     expect(result.exitCode).toBe(2);
     expect(result.lines.join('\n')).toContain('FACTORY_OWNER_DATABASE_URL');
   });
 
   it('A1.13 an unknown subcommand exits non-zero', async () => {
-    const { run } = await import('../../apps/cli/src/index.ts');
     const result = await run(['db', 'nope'], { FACTORY_OWNER_DATABASE_URL: 'postgresql://x/y' });
     expect(result.exitCode).toBe(2);
     expect(result.lines.join('\n')).toContain('unknown command');
@@ -184,7 +205,6 @@ describe('T-1.02 · the CLI', () => {
   it('A1.13 `factory db migrate` applies the migrations', async () => {
     const pg = await createPostgres('factory_t1_02_cli');
     try {
-      const { run } = await import('../../apps/cli/src/index.ts');
       const result = await run(['db', 'migrate'], {
         FACTORY_OWNER_DATABASE_URL: pg.superuserUrl,
         FACTORY_MIGRATIONS_DIR: migrationsDir,
@@ -204,7 +224,6 @@ describe('T-1.02 · the CLI', () => {
   it('A1.13 `factory db partitions --ensure` creates the monthly partitions', async () => {
     const pg = await createPostgres('factory_t1_02_cli_parts');
     try {
-      const { run } = await import('../../apps/cli/src/index.ts');
       const env = {
         FACTORY_OWNER_DATABASE_URL: pg.superuserUrl,
         FACTORY_MIGRATIONS_DIR: migrationsDir,

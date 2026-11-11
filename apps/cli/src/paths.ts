@@ -93,3 +93,66 @@ export const resolveDefinitionDirectory = (
 
   return join(repoRoot(), 'definition');
 };
+
+/**
+ * The schemas directory — the committed JSON Schema export.
+ *
+ * The doctor's `schemas` check compares the committed export with what the
+ * contracts produce, so it needs **both**: the directory the export lives
+ * in, and the contracts' **compiled** registry to compare it against.
+ *
+ * The compiled registry is needed because the export is produced by
+ * `tools/export-schemas.ts`, which reads `packages/contracts/dist/`. So
+ * the check can only run once the contracts have been built — and it says
+ * so, rather than reporting a false pass.
+ *
+ * Resolution order:
+ *  1. `FACTORY_SCHEMAS_DIR` — an explicit override.
+ *  2. the nearest `schemas/` directory at or above the working directory.
+ *  3. the repository root's `schemas/` directory.
+ *
+ * `undefined` when there is no schemas directory at all — the caller then
+ * says so, rather than the check quietly passing.
+ */
+export const resolveSchemasDirectory = (
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined => {
+  const override = environment['FACTORY_SCHEMAS_DIR'];
+  if (override !== undefined && override !== '') {
+    return resolve(override);
+  }
+
+  let current = resolve(process.cwd());
+  for (;;) {
+    const candidate = join(current, 'schemas');
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+
+  const fallback = join(repoRoot(), 'schemas');
+  return existsSync(fallback) ? fallback : undefined;
+};
+
+/**
+ * The contracts' compiled output directory.
+ *
+ * `undefined` when it does not exist — the contracts have not been built,
+ * and the `schemas` check says so instead of passing.
+ */
+export const resolveContractsDistDirectory = (
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined => {
+  const override = environment['FACTORY_CONTRACTS_DIST_DIR'];
+  if (override !== undefined && override !== '') {
+    return resolve(override);
+  }
+
+  const candidate = join(repoRoot(), 'packages', 'contracts', 'dist');
+  return existsSync(candidate) ? candidate : undefined;
+};
