@@ -1,0 +1,275 @@
+/*
+ * `dashboard/styles` — the one view's styling (T-1.16).
+ *
+ * ## Why the styling is this plain
+ *
+ * blueprint `15` §10.1 says the operational set is deliberately small,
+ * and the dashboard is a **private** tool (D9). So the styling is a
+ * plain system stack, a dark palette, and no design system — because a
+ * design system for five regions on one page would be more code than
+ * the page.
+ *
+ * ## The two things the styling must get right
+ *
+ * 1. **The alarm is visible.** A region that is saying something is
+ *    wrong is marked with a colour *and* a left border — so it is
+ *    distinguishable without relying on colour alone.
+ * 2. **The order is the reading order.** The five regions are laid out
+ *    in the pack's order, with "Needs you" first.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --ink: #e6e6e6;
+  --ink-dim: #9a9a9a;
+  --surface: #14161a;
+  --surface-raised: #1c1f25;
+  --line: #2a2e36;
+  --alarm: #d95d5d;
+  --warn: #d9a441;
+  --ok: #5dba7d;
+  --accent: #6b9bd1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.dashboard {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.dashboard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.dashboard__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.dashboard__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dashboard__kill-switch {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.dashboard__kill-switch[data-engaged='true'] {
+  border-color: var(--alarm);
+  color: var(--alarm);
+}
+
+.dashboard__kill-switch-message {
+  color: var(--ink-dim);
+}
+
+.dashboard__status {
+  margin: 1rem 0;
+  color: var(--ink-dim);
+}
+
+.dashboard__status--failed {
+  color: var(--alarm);
+}
+
+/* The five regions, in the pack's reading order. */
+.dashboard__regions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.region {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  padding: 0.75rem 1rem 1rem;
+}
+
+.region[data-alarm='true'] {
+  border-left-color: var(--alarm);
+}
+
+.region__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.region__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.region__status {
+  color: var(--ink-dim);
+  font-size: 0.85rem;
+}
+
+.region__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.5rem;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+button.row {
+  cursor: pointer;
+}
+
+button.row:hover,
+button.row:focus-visible {
+  background: #23272f;
+  outline: none;
+}
+
+.row__title {
+  font-weight: 500;
+}
+
+.row__meta,
+.row__age,
+.row__cost,
+.row__task,
+.row__actor,
+.row__correlation,
+.row__next,
+.row__severity {
+  color: var(--ink-dim);
+  font-size: 0.85rem;
+}
+
+.row__risk {
+  min-width: 2ch;
+  font-weight: 600;
+  color: var(--warn);
+}
+
+.row--health[data-severity='failing'] .row__severity {
+  color: var(--alarm);
+}
+
+.row--health[data-severity='degraded'] .row__severity {
+  color: var(--warn);
+}
+
+.row--health[data-severity='stale'] .row__severity {
+  color: var(--ink-dim);
+}
+
+.row__task,
+.row__actor,
+.row__correlation,
+.row__next {
+  margin-left: auto;
+}
+
+.timeline {
+  margin-top: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  padding: 0.75rem 1rem 1rem;
+}
+
+.timeline__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.timeline__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.timeline__close {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+  font: inherit;
+}
+
+.timeline__empty {
+  color: var(--ink-dim);
+}
+
+.timeline__events {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.timeline__event {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.timeline__seq {
+  min-width: 5ch;
+  color: var(--ink-dim);
+  text-align: right;
+}
+
+.timeline__type {
+  font-weight: 500;
+}

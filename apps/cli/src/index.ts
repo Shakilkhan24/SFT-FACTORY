@@ -6,6 +6,23 @@
  * each is added here as a new subcommand, and the table stays the single
  * place that says what exists.
  *
+ * ## The two kinds of command
+ *
+ * The catalogue has two kinds, and they differ in **where the authority
+ * comes from**:
+ *
+ * * **ops** commands (`db`, `events`, `projections`, `definition`) run as
+ *   a Postgres role and read the database directly;
+ * * **access-point** commands (`login`, `whoami`, `tasks`, `kill-switch`)
+ *   run as a human with a `fac_…` token and go through the API.
+ *
+ * The access-point commands go through the API because pack `04` §3 says
+ * every call emits an event with `actor=human:<login>` and
+ * `authority.basis='human-access-point'`. A command that wrote to the
+ * database directly would change the factory without leaving a trace of
+ * who changed it — and for the kill switch that is exactly the trace an
+ * operator most needs.
+ *
  * The CLI never imports another app (pack 02 §3) — it wires packages together.
  */
 
@@ -21,6 +38,16 @@ import {
 import { runEventsCommand } from './events.js';
 import { resolveDefinitionDirectory } from './paths.js';
 import { runProjectionsCommand, PROJECTIONS_SUBCOMMANDS } from './projections.js';
+import { DEFAULT_API_URL } from './client.js';
+import { runKillSwitch } from './kill-switch.js';
+import {
+  runLogin,
+  runTasksList,
+  runTasksShow,
+  runWhoami,
+  type AccessPointOptions,
+} from './tasks.js';
+import { runAuditChain, PostgresChainVerifier, type ChainVerifier } from './audit.js';
 
 const USAGE = `usage: factory <command> [options]
 
@@ -48,6 +75,14 @@ commands:
   definition apply --sha <sha> [--approval <id>]
                          apply a definition SHA (needs a bound approval)
 
+  login --token fac_…    store a CLI token and prove it works
+  whoami                 show who the stored token is
+  tasks ls [--limit N] [--state S]
+                         list the tasks the API knows about
+  tasks show <taskId>    show one task
+  kill-switch on|off --reason <why>
+                         engage or release the factory's kill switch
+
 environment:
   FACTORY_OWNER_DATABASE_URL   connection string for the factory_owner role
   FACTORY_PROJECTOR_DATABASE_URL
@@ -56,6 +91,8 @@ environment:
                                connection string for the factory_applier role
   FACTORY_MIGRATIONS_DIR       override the migrations directory
   FACTORY_DEFINITION_DIR       override the definition directory
+  FACTORY_API_URL               base URL of the access-point API
+  XDG_CONFIG_HOME               where the CLI keeps its credentials
 `;
 
 export interface CliResult {
@@ -87,6 +124,64 @@ const ownerRoleMode = (
   environment: NodeJS.ProcessEnv = process.env,
 ): 'direct' | 'assume' =>
   environment['FACTORY_DB_ROLE_MODE'] === 'assume' ? 'assume' : 'direct';
+
+/**
+ * The base URL the access-point commands use.
+ *
+ * `FACTORY_API_URL`, defaulting to the loopback. The default is the
+ * loopback because the API is a private access point — a CLI that
+ * defaulted to a public host would be a foot-gun.
+ */
+const apiUrl = (environment: NodeJS.ProcessEnv = process.env): string =>
+  environment['FACTORY_API_URL'] ?? DEFAULT_API_URL;
+
+/**
+ * The options the access-point commands read.
+ */
+const accessPointOptions = (
+  environment: NodeJS.ProcessEnv = process.env,
+): AccessPointOptions => ({
+  apiUrl: apiUrl(environment),
+  environment,
+});
+
+/**
+ * Build the chain verifier the `audit chain` command uses.
+ *
+ * The **Postgres** verifier is the real one — it wraps
+ * `PostgresEventLog.verifyChain`. It needs a connection string; without
+ * one the command has nothing to verify, and it says so rather than
+ * reporting an empty chain as intact.
+ */
+const buildChainVerifier = async (
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<ChainVerifier | undefined> => {
+  const connectionString =
+    environment['FACTORY_PROJECTOR_DATABASE_URL'] ??
+    environment['FACTORY_OWNER_DATABASE_URL'];
+  if (connectionString === undefined) {
+    return undefined;
+  }
+  const { PostgresEventLog } = await import('@factory/eventlog');
+  const { createDatabase, destroyDatabase } = await import('@factory/db');
+  const db = createDatabase({
+    connectionString,
+    role: 'factory_projector',
+    mode: ownerRoleMode(environment),
+    max: 2,
+  });
+  const log = new PostgresEventLog({ db });
+  const verifier = new PostgresChainVerifier(log);
+  return {
+    verify: async (aggregate) => {
+      try {
+        return await verifier.verify(aggregate);
+      } finally {
+        await destroyDatabase(db);
+      }
+    },
+  };
+};
 
 /**
  * Run the CLI with an argument vector (without `node` and the script path).
@@ -257,6 +352,78 @@ export const run = async (
     } finally {
       await destroy();
     }
+  }
+
+  // ---- the access-point commands ---------------------------------------
+  //
+  // These run as a human with a `fac_…` token and go through the API,
+  // so every change they make is recorded with the caller's authority.
+
+  if (command === 'login') {
+    const parsed = parseArgs(rest);
+    const token = typeof parsed.flags['token'] === 'string' ? parsed.flags['token'] : undefined;
+    return runLogin(token, accessPointOptions(environment));
+  }
+
+  if (command === 'whoami') {
+    return runWhoami(accessPointOptions(environment));
+  }
+
+  if (command === 'tasks') {
+    const [subcommand, ...subArgs] = rest;
+    if (subcommand === undefined) {
+      return { lines: ['usage: factory tasks ls | show <taskId>'], exitCode: 2 };
+    }
+    if (subcommand === 'ls' || subcommand === 'list') {
+      const parsed = parseArgs(subArgs);
+      const limit =
+        typeof parsed.flags['limit'] === 'string' ? Number(parsed.flags['limit']) : undefined;
+      const state = typeof parsed.flags['state'] === 'string' ? parsed.flags['state'] : undefined;
+      return runTasksList({
+        ...accessPointOptions(environment),
+        ...(limit === undefined ? {} : { limit }),
+        ...(state === undefined ? {} : { state }),
+      });
+    }
+    if (subcommand === 'show') {
+      return runTasksShow(subArgs[0], accessPointOptions(environment));
+    }
+    return {
+      lines: [`unknown subcommand \`factory tasks ${subcommand}\``, 'usage: factory tasks ls | show <taskId>'],
+      exitCode: 2,
+    };
+  }
+
+  if (command === 'kill-switch') {
+    const [state, ...subArgs] = rest;
+    const parsed = parseArgs(subArgs);
+    const reason = typeof parsed.flags['reason'] === 'string' ? parsed.flags['reason'] : undefined;
+    return runKillSwitch(state, reason, accessPointOptions(environment));
+  }
+
+  if (command === 'audit') {
+    const [subcommand, ...subArgs] = rest;
+    if (subcommand !== 'chain') {
+      return {
+        lines: [
+          `unknown subcommand \`factory audit ${subcommand ?? ''}\``,
+          'usage: factory audit chain <taskId>',
+        ],
+        exitCode: 2,
+      };
+    }
+    const verifier = await buildChainVerifier(environment);
+    if (verifier === undefined) {
+      return {
+        lines: [
+          'FACTORY_PROJECTOR_DATABASE_URL is not set.',
+          'The audit chain command verifies the event log, so it needs a database.',
+          'It reads the log through the factory_projector role.',
+        ],
+        exitCode: 2,
+      };
+    }
+    return runAuditChain(subArgs[0], verifier);
   }
 
   return {

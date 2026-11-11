@@ -2,7 +2,7 @@
   "name": "software-factory",
   "version": "0.1.0",
   "private": true,
-  "description": "The Software Factory \u2014 an autonomous software-production system whose value rests on independent verification, deterministic policy, and human control.",
+  "description": "The Software Factory — an autonomous software-production system whose value rests on independent verification, deterministic policy, and human control.",
   "type": "module",
   "packageManager": "pnpm@10.8.1",
   "engines": {
@@ -27,6 +27,7 @@
     "test:fault": "vitest run tests/fault --passWithNoTests",
     "test:concurrency": "vitest run tests/concurrency --passWithNoTests",
     "test:e2e": "vitest run tests/e2e --passWithNoTests",
+    "test:e2e:browser": "playwright test",
     "test:mutation": "vitest run tests/invariants --mutation",
     "test:mutation:artefacts": "node tools/mutate-artefacts.ts",
     "test:mutation:api": "node tools/mutate-api.ts",
@@ -36,6 +37,7 @@
     "test:mutation:isolation": "node tools/mutate-isolation.ts",
     "test:mutation:orchestrator": "node tools/mutate-orchestrator.ts",
     "test:mutation:projections": "node tools/mutate-projections.ts",
+    "test:mutation:operational-surface": "node tools/mutate-operational-surface.ts",
     "coverage-check": "node tools/coverage-check.mjs"
   },
   "devDependencies": {
@@ -55,6 +57,7 @@
     "@factory/policy": "workspace:*",
     "@factory/projections": "workspace:*",
     "@factory/state": "workspace:*",
+    "@playwright/test": "1.63.0",
     "@types/js-yaml": "4.0.9",
     "@types/node": "22.9.0",
     "dependency-cruiser": "18.7.2",

@@ -10,6 +10,10 @@ coverage/
 .next/
 target/
 
+# The browser oracle's output — Playwright's report and trace directory
+test-results/
+playwright-report/
+
 # Environment & secrets — never commit
 .env
 .env.*

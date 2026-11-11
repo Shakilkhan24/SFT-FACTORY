@@ -39,8 +39,11 @@ import type {
   KillSwitch,
   ReviewPort,
   SessionStore,
+  StreamEvent,
+  StreamSource,
   TokenStore,
 } from './ports.js';
+import { classify } from './stream.js';
 
 /**
  * The recording event sink.
@@ -75,6 +78,58 @@ export class RecordingEventSink implements EventSink {
   /** Forget everything — for a test that resets between phases. */
   public clear(): void {
     this.#events.length = 0;
+  }
+}
+
+/**
+ * The recording stream source.
+ *
+ * It holds the events a test pushed into it and yields the ones after
+ * the cursor — so a test can assert what the stream carried, and a
+ * test can assert what it **did not** carry.
+ *
+ * The events are **classified** as they are pushed, so the double
+ * exercises the same mapping the real source does. A double that
+ * accepted pre-classified events would let the mapping go untested.
+ */
+export class RecordingStreamSource implements StreamSource {
+  readonly #events: StreamEvent[] = [];
+
+  /**
+   * Push an event onto the stream.
+   *
+   * An event whose type the stream does not carry is **dropped** — the
+   * same rule the real source applies.
+   */
+  public push(event: {
+    readonly seq: number;
+    readonly eventType: string;
+    readonly aggregate: { readonly kind: string; readonly id: string };
+    readonly occurredAt: string;
+    readonly payload: unknown;
+  }): void {
+    const classified = classify(event);
+    if (classified === undefined) {
+      return;
+    }
+    this.#events.push(classified);
+  }
+
+  /**
+   * The events after `afterSeq`, in sequence order.
+   */
+  public async *subscribe(afterSeq: number): AsyncIterable<StreamEvent> {
+    const ordered = [...this.#events].sort((left, right) => left.seq - right.seq);
+    for (const event of ordered) {
+      if (event.seq > afterSeq) {
+        yield await Promise.resolve(event);
+      }
+    }
+  }
+
+  /** The events the source holds. */
+  public get events(): readonly StreamEvent[] {
+    return this.#events;
   }
 }
 

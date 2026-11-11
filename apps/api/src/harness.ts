@@ -36,6 +36,7 @@ import {
   InMemorySessionStore,
   InMemoryTokenStore,
   RecordingEventSink,
+  RecordingStreamSource,
   testClock,
   testIds,
 } from './fakes.js';
@@ -56,6 +57,8 @@ export interface Harness {
   readonly appDeps: AppDeps;
   /** The event sink — every event the app appended. */
   readonly events: RecordingEventSink;
+  /** The stream source — the events `GET /v1/stream` would carry. */
+  readonly stream: RecordingStreamSource;
   /** The allow-list. */
   readonly allowList: InMemoryAllowList;
   /** The sessions. */
@@ -102,6 +105,15 @@ export interface Harness {
    * answer `404`.
    */
   readonly registeredRoutes: readonly { readonly method: string; readonly url: string }[];
+  /**
+   * Start the app on a real port and return its base URL.
+   *
+   * `inject` cannot serve the SSE route: the stream holds its
+   * connection open for as long as the client is there, and `inject`
+   * waits for the response to **complete**. So a test that needs the
+   * stream's real behaviour listens for real.
+   */
+  readonly listen: (port?: number) => Promise<string>;
   /** Close the app. */
   readonly close: () => Promise<void>;
 }
@@ -149,6 +161,7 @@ export const buildHarness = async (
   ];
 
   const events = new RecordingEventSink();
+  const stream = new RecordingStreamSource();
   const sessions = new InMemorySessionStore();
   const tokens = new InMemoryTokenStore();
   const allowList = new InMemoryAllowList();
@@ -211,6 +224,7 @@ export const buildHarness = async (
     clock: testClock(now),
     nextId: () => ids.next(),
     events,
+    stream,
     sessions,
     tokens,
     allowList,
@@ -250,6 +264,7 @@ export const buildHarness = async (
     deps,
     appDeps,
     events,
+    stream,
     allowList,
     sessions,
     tokens,
@@ -267,6 +282,14 @@ export const buildHarness = async (
     cliToken,
     cliToken2,
     registeredRoutes,
+    listen: async (port?: number): Promise<string> => {
+      await app.listen({ port: port ?? 0, host: '127.0.0.1' });
+      const address = app.server.address();
+      if (address === null || typeof address === 'string') {
+        throw new Error('the app did not report a listening address');
+      }
+      return `http://127.0.0.1:${String(address.port)}`;
+    },
     close: () => app.close(),
   };
 };

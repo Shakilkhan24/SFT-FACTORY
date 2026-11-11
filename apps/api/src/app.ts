@@ -398,6 +398,11 @@ const registerOne = (
             body: result.value,
             requestId,
           });
+          if (result.hijacked === true) {
+            // The handler wrote the response itself. Sending a body
+            // now would append a second document after its frames.
+            return;
+          }
           reply.status(result.status).send(result.value);
           return;
         }
@@ -418,6 +423,10 @@ const registerOne = (
             .status(result.refusal.status)
             .header('content-type', 'application/problem+json')
             .send(toProblemDocument(result.refusal, requestId));
+          return;
+        }
+        if (result.hijacked === true) {
+          // The SSE stream wrote the frames itself.
           return;
         }
         reply.status(result.status).send(result.value);

@@ -28,15 +28,30 @@ import type { Actor, Authority, EventType, NewEvent } from '@factory/contracts';
 import type { Clock } from '@factory/core';
 
 import type { Refusal } from './problem.js';
+import type { StreamClass } from './stream.js';
 
 /**
  * The result of an access-point call.
  *
  * A refusal is an **expected** failure, so it is a value (AGENTS.md §4).
  * The handler returns it; the error handler renders it.
+ *
+ * The `hijacked` flag is for the one route that writes its own body:
+ * the SSE stream. Fastify's reply is built for a single body, and a
+ * stream is a sequence of frames over a long-lived connection — so the
+ * stream handler takes the raw response, writes the headers and the
+ * frames itself, and tells the app "do not send a body". Without the
+ * flag the app would send a second body after the frames, which is
+ * exactly the corruption the SSE format forbids.
  */
 export type HandlerResult<T> =
-  | { readonly ok: true; readonly value: T; readonly status: number }
+  | {
+      readonly ok: true;
+      readonly value: T;
+      readonly status: number;
+      /** The handler wrote the response itself. Do not send a body. */
+      readonly hijacked?: boolean;
+    }
   | { readonly ok: false; readonly refusal: Refusal };
 
 /**
@@ -59,6 +74,17 @@ export const handled = <T>(
   value: T,
   status = 200,
 ): HandlerResult<T> => ({ ok: true, value, status });
+
+/**
+ * A handler that succeeded **and wrote the response itself**.
+ *
+ * The SSE stream is the only caller: it writes the headers and the
+ * frames to the raw response, so the app must not send a body after it.
+ */
+export const hijacked = <T>(
+  value: T,
+  status = 200,
+): HandlerResult<T> => ({ ok: true, value, status, hijacked: true });
 
 /**
  * A handler that was refused.
@@ -91,6 +117,45 @@ export interface CallerIdentity {
 export interface EventSink {
   /** Append an event. */
   append(event: NewEvent): Promise<void>;
+}
+
+/**
+ * The stream source — where `GET /v1/stream` reads from.
+ *
+ * The port is **one method**: `subscribe(afterSeq)` yields the events
+ * after a sequence. The caller owns the cursor, so a resume from
+ * `Last-Event-ID` is the caller's business — and the port cannot
+ * express a "send me everything" that is not a resume.
+ *
+ * The source is **polled**, not woken. T-1.15's escalation recorded the
+ * same for the projector: a `LISTEN` needs a dedicated connection held
+ * open, and that belongs to the worker's ticket.
+ */
+export interface StreamSource {
+  /** The events after `afterSeq`. */
+  subscribe(afterSeq: number): AsyncIterable<StreamEvent>;
+}
+
+/**
+ * One event on the stream.
+ *
+ * The shape is the **classified** event: the log's event plus the
+ * stream class it maps to. The classification happens at the source, so
+ * the stream carries six classes and not the log's sixty-odd types.
+ */
+export interface StreamEvent {
+  /** The event's sequence in the log — the SSE `id:`. */
+  readonly seq: number;
+  /** The event's type. */
+  readonly eventType: string;
+  /** The class it maps to. */
+  readonly class: StreamClass;
+  /** The aggregate it belongs to. */
+  readonly aggregate: { readonly kind: string; readonly id: string };
+  /** When it happened. */
+  readonly occurredAt: string;
+  /** Its payload. */
+  readonly payload: unknown;
 }
 
 /**
@@ -492,6 +557,8 @@ export interface ApiDeps {
   readonly nextId: () => string;
   /** The event sink. */
   readonly events: EventSink;
+  /** The stream source — where `GET /v1/stream` reads from. */
+  readonly stream: StreamSource;
   /** The browser sessions. */
   readonly sessions: SessionStore;
   /** The CLI tokens. */

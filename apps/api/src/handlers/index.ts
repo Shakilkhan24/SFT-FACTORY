@@ -56,6 +56,7 @@ import {
   listTasks,
 } from './inspect.js';
 import { decideReview, listReviews, readReview } from './review.js';
+import { streamEvents } from './stream.js';
 
 /**
  * The key a handler is bound to.
@@ -134,7 +135,7 @@ const buildHandlers = (
   bind(handlers, 'GET', '/v1/runs/{id}/artefacts/{name}', readRunArtefact(deps));
   bind(handlers, 'GET', '/v1/metrics/summary', readMetricsSummary(deps));
   bind(handlers, 'GET', '/v1/audit/explain', readAuditExplain(deps));
-  bind(handlers, 'GET', '/v1/stream', streamStub());
+  bind(handlers, 'GET', '/v1/stream', streamEvents(deps, { source: deps.stream }));
 
   // ---- AP-5 · intervene ------------------------------------------------
   bind(handlers, 'POST', '/v1/tasks/{id}/pause', intervene(deps, 'pause'));
@@ -179,38 +180,6 @@ const webhookStub = (): RegisteredRoute['handler'] => {
         status: 501,
         detail:
           'the GitHub webhook is not implemented in this build — the signature verification belongs to the SCM adapter',
-        code: 'validation',
-      }),
-    );
-};
-
-/**
- * The SSE stream's stub.
- *
- * pack `04` §3 (AP-4): "`GET /v1/stream` — **SSE**: `task.updated`,
- * `approval.requested`, `review.queued`, `health.changed`,
- * `cost.updated`, `killswitch.changed`; `id:` = event `seq` for
- * `Last-Event-ID` resume."
- *
- * The stream's **source** is the event log, and the projections that
- * turn the log into the stream's event classes are T-1.15's ticket. So
- * the route exists and is authenticated — a stream that nobody can reach
- * would be worse than one that says so — but it refuses rather than
- * opening a connection that never carries anything.
- *
- * It refuses with `501`, not `200` with an empty body: a client that
- * connects and sees nothing cannot tell "no events yet" from "not
- * implemented", and the second must not look like the first.
- */
-const streamStub = (): RegisteredRoute['handler'] => {
-  return (): Promise<ReturnType<typeof handled>> =>
-    Promise.resolve(
-      refused({
-        type: 'about:blank',
-        title: 'Not implemented',
-        status: 501,
-        detail:
-          'the event stream is not implemented in this build — its event classes come from the projections',
         code: 'validation',
       }),
     );

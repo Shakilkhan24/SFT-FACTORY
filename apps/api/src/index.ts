@@ -109,6 +109,7 @@ export {
 export {
   ACCESS_POINT_SCOPES,
   handled,
+  hijacked,
   isAccessPointScope,
   refused,
   type AccessPointScope,
@@ -127,8 +128,33 @@ export {
   type KillSwitch,
   type ReviewPort,
   type SessionStore,
+  type StreamEvent,
+  type StreamSource,
   type TokenStore,
 } from './ports.js';
+
+export {
+  CLASS_BY_EVENT_TYPE,
+  InMemoryStreamSource,
+  STREAM_CLASSES,
+  classFor,
+  classify,
+  isStreamClass,
+  type ClassifiedEvent,
+  type StreamClass,
+} from './stream.js';
+
+export {
+  carriedClasses,
+  frameEvent,
+  LAST_EVENT_ID_HEADER,
+  LAST_EVENT_ID_QUERY,
+  OPEN_COMMENT,
+  readRequestedClasses,
+  resumeFrom,
+  streamEvents,
+  type StreamOptions,
+} from './handlers/stream.js';
 
 export {
   InMemoryAllowList,
@@ -142,6 +168,7 @@ export {
   InMemorySessionStore,
   InMemoryTokenStore,
   RecordingEventSink,
+  RecordingStreamSource,
   testClock,
   testIds,
   type FakeApproval,
